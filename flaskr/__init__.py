@@ -3,7 +3,7 @@ import os
 from flask import Flask, request,jsonify
 from Sports2D.p2 import process_fun, setup_pose_tracker
 from Sports2D.Sports2D import prep_process, DEFAULT_CONFIG2
-
+from pathlib import Path
 
 tracking_rtmlib = True
 det_frequency = 1
@@ -53,11 +53,19 @@ def create_app(test_config=None):
     @app.route("/gettrc")
     def trc():
         pose_tracker = get_pt()
-        trc_data = process_fun(config_dict, video_file, time_range, frame_rate, result_dir,pose_tracker)
-        message = request.args.get('message')
-        print(f" the message: {message}")
-        #return jsonify(trc_data)
-        #return trc_data.to_json()
-        return jsonify(trc_data['t'].to_dict())
+        vidpath = request.args.get("path")
+        if vidpath != None:
+            vidp = Path(vidpath)
+            if os.path.exists(vidp):
+                trc_data = process_fun(config_dict, vidp, time_range, frame_rate, result_dir,pose_tracker)
+                message = request.args.get('message')
+                print(f" the message: {message}")
+                #return jsonify(trc_data)
+                #return trc_data.to_json()
+                return jsonify(trc_data['t'].to_dict())
+            else:
+                return "Bad file path"
+        else:
+            return "ERROR"
 
     return app

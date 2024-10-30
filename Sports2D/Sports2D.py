@@ -451,13 +451,10 @@ def process(config='Config_demo.toml'):
 
     logging.shutdown()
 
-def process2(config):
+def prep_process(config):
     '''
     setup server and only do what I want
     '''
-
-    from Sports2D.p2 import process_fun
-    
     if type(config) == dict:
         config_dict = config
     else:
@@ -485,12 +482,17 @@ def process2(config):
     video_file = "C:/Users/schoch/Documents/dev/QT_UI/sim_buddy_ui/simbuddy/test_data/swings/test_small.mp4"
 
     frame_rate = 30
-    time_range = []
+    time_range = [] 
+    return config_dict,video_file, time_range, frame_rate, result_dir
+
+def process2(config):
+    from Sports2D.p2 import process_fun
+    config_dict,video_file, time_range, frame_rate, result_dir = prep_process(config)
     trc_data = process_fun(config_dict, video_file, time_range, frame_rate, result_dir)
     print(f" trc data:\n {trc_data['LWrist']}")
+    #logging.shutdown()
 
 
-    logging.shutdown()
 
 
 def main():

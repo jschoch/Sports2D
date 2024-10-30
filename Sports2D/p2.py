@@ -932,7 +932,7 @@ def angle_plots(angle_data_unfiltered, angle_data, person_id):
     pw.show()
 
 
-def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
+def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pose_tracker):
     '''
     Detect 2D joint centers from a video or a webcam with RTMLib.
     Compute selected joint and segment angles. 
@@ -1063,7 +1063,12 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
 
     # Set up pose tracker
     tracking_rtmlib = True if (tracking_mode == 'rtmlib' and tracking) else False
-    pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
+    if (pose_tracker == None):
+        print(" setting up the pose tracker")
+        pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
+    else:
+        print(f"found pose tracker {pose_tracker}")
+
     logging.info(f'Pose tracking set up for BodyWithFeet model in {mode} mode.')
     logging.info(f'Persons are detected every {det_frequency} frames and tracked inbetween. Multi-person is {"" if tracking else "not "}selected.')
     logging.info(f"Parameters: {f'{tracking_mode=}, ' if tracking else ''}{keypoint_likelihood_threshold=}, {average_likelihood_threshold=}, {keypoint_number_threshold=}")

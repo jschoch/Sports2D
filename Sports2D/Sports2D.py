@@ -191,12 +191,12 @@ DEFAULT_CONFIG2 =   {'project': {'video_input': ['test.mp4'],
                                 'webcam_id': 0,
                                 'input_size': [1280, 720]
                                 },
-                    'process': {'multiperson': True,
-                                'show_realtime_results': True,
-                                'save_vid': True,
-                                'save_img': True,
+                    'process': {'multiperson': False,
+                                'show_realtime_results': False,
+                                'save_vid': False,
+                                'save_img': False,
                                 'save_pose': True,
-                                'save_angles': True,
+                                'save_angles': False,
                                 'result_dir': ''
                                 },
                     'pose':     {'pose_model': 'body_with_feet',
@@ -239,7 +239,7 @@ DEFAULT_CONFIG2 =   {'project': {'video_input': ['test.mp4'],
                                         'interp_gap_smaller_than': 10,
                                         'fill_large_gaps_with': 'last_value',
                                         'filter': True,
-                                        'show_graphs': True,
+                                        'show_graphs': False,
                                         'filter_type': 'butterworth',
                                         'butterworth': {'order': 4, 'cut_off_frequency': 3},
                                         'gaussian': {'sigma_kernel': 1},
@@ -479,10 +479,15 @@ def process2(config):
         handlers = [logging.StreamHandler()]) 
 
     logging.info(f"stuff: vd: {video_dir} rd: {result_dir}")
-    video_file = 'test.mp4'
+    #video_file = 'test.mp4'
+    #video_file = r"./test_data/swings/20241024-134406-left.mp4"
+    #video_file = "C:/Users/schoch/Documents/dev/QT_UI/sim_buddy_ui/simbuddy/test_data/swings/20241024-134406-left.mp4"
+    video_file = "C:/Users/schoch/Documents/dev/QT_UI/sim_buddy_ui/simbuddy/test_data/swings/test_small.mp4"
+
     frame_rate = 30
-    time_range = None 
-    process_fun(config_dict, video_file, time_range, frame_rate, result_dir)
+    time_range = []
+    trc_data = process_fun(config_dict, video_file, time_range, frame_rate, result_dir)
+    print(f" trc data:\n {trc_data['LWrist']}")
 
 
     logging.shutdown()

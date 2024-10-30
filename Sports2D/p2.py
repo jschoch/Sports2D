@@ -152,9 +152,10 @@ def setup_video(video_file_path, save_vid, vid_output_path):
     cam_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     cam_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+    fps = cap.get(cv2.CAP_PROP_FPS)
     out_vid = None
     if save_vid:
-        fps = cap.get(cv2.CAP_PROP_FPS)
+        
         if fps == 0: fps = 30
         # try:
         #     fourcc = cv2.VideoWriter_fourcc(*'avc1') # =h264. better compression and quality but may fail on some systems
@@ -775,6 +776,22 @@ def write_angle_as_list(img, ang, ang_name, person_label_position, ang_label_lin
     return ang_label_line
 
 
+def save_trc_data(trc_data):
+    #Header
+    frame_rate = (len(X)-1)/(time.iloc[-1] - time.iloc[0])
+    DataRate = CameraRate = OrigDataRate = frame_rate
+    NumFrames = len(X)
+    NumMarkers = len(X.columns)
+    keypoint_names = X.columns
+    header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + trc_path, 
+            'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
+            '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, 0, NumFrames])),
+            'Frame#\tTime\t' + '\t\t\t'.join(keypoint_names) + '\t\t',
+            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(keypoint_names))])]
+    with open(trc_path, 'w') as trc_o:
+        [trc_o.write(line+'\n') for line in header_trc]
+        trc_data.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
+
 def make_trc_with_XYZ(X, Y, Z, time, trc_path):
     '''
     Write a trc file from 3D coordinates and time, compatible with OpenSim.
@@ -790,26 +807,11 @@ def make_trc_with_XYZ(X, Y, Z, time, trc_path):
     - trc_data: pd.DataFrame. The data that has been written to the TRC file
     '''
 
-    #Header
-    frame_rate = (len(X)-1)/(time.iloc[-1] - time.iloc[0])
-    DataRate = CameraRate = OrigDataRate = frame_rate
-    NumFrames = len(X)
-    NumMarkers = len(X.columns)
-    keypoint_names = X.columns
-    header_trc = ['PathFileType\t4\t(X/Y/Z)\t' + trc_path, 
-            'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames', 
-            '\t'.join(map(str,[DataRate, CameraRate, NumFrames, NumMarkers, 'm', OrigDataRate, 0, NumFrames])),
-            'Frame#\tTime\t' + '\t\t\t'.join(keypoint_names) + '\t\t',
-            '\t\t'+'\t'.join([f'X{i+1}\tY{i+1}\tZ{i+1}' for i in range(len(keypoint_names))])]
+    
     
     # Data
     trc_data = pd.concat([pd.concat([X.iloc[:,kpt], Y.iloc[:,kpt], Z.iloc[:,kpt]], axis=1) for kpt in range(len(X.columns))], axis=1)
     trc_data.insert(0, 't', time)
-
-    # Write file
-    with open(trc_path, 'w') as trc_o:
-        [trc_o.write(line+'\n') for line in header_trc]
-        trc_data.to_csv(trc_o, sep='\t', index=True, header=None, lineterminator='\n')
 
     return trc_data
 
@@ -1026,17 +1028,11 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
                            gaussian_filter_kernel, loess_filter_kernel, median_filter_kernel]
 
 
-    print("unf")
-    return
+    
 
-    # Create output directories
-    if video_file == "webcam":
-        current_date = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir_name = f'webcam_{current_date}'
-    else:
-        video_file_path = video_dir / video_file
-        video_file_stem = video_file.stem
-        output_dir_name = f'{video_file_stem}_Sports2D'    
+    video_file_path = Path(video_file)
+    video_file_stem = video_file_path.stem
+    output_dir_name = f'{video_file_stem}_Sports2D'    
     output_dir = result_dir / output_dir_name
     img_output_dir = output_dir / f'{output_dir_name}_img'
     vid_output_path = output_dir / f'{output_dir_name}.mp4'
@@ -1058,21 +1054,12 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
     RHeel_idx = keypoints_ids[keypoints_names.index('RHeel')]
     L_R_direction_idx = [Ltoe_idx, LHeel_idx, Rtoe_idx, RHeel_idx]
 
+    print(f"vid: {video_file_path}")
+    cap, out_vid, cam_width, cam_height, fps = setup_video(video_file_path, save_vid, vid_output_path)
+    frame_range = [int(time_range[0] * frame_rate), int(time_range[1] * frame_rate)] if time_range else [0, int(cap.get(cv2.CAP_PROP_FRAME_COUNT))]
+    frame_iterator = tqdm(range(*frame_range)) # use a progress bar
 
-    # Set up video capture
-    if video_file == "webcam":
-        cap, out_vid, cam_width, cam_height, fps = setup_webcam(webcam_id, save_vid, vid_output_path, input_size)
-        frame_range = [0,sys.maxsize]
-        frame_iterator = range(*frame_range)
-        logging.warning('Webcam input: the framerate may vary. If results are filtered, Sports2D will use the average framerate as input.')
-    else:
-        cap, out_vid, cam_width, cam_height, fps = setup_video(video_file_path, save_vid, vid_output_path)
-        frame_range = [int(time_range[0] * frame_rate), int(time_range[1] * frame_rate)] if time_range else [0, int(cap.get(cv2.CAP_PROP_FRAME_COUNT))]
-        frame_iterator = tqdm(range(*frame_range)) # use a progress bar
-    if show_realtime_results:
-        cv2.namedWindow(f'{video_file} Sports2D', cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
-        cv2.setWindowProperty(f'{video_file} Sports2D', cv2.WND_PROP_ASPECT_RATIO, cv2.WINDOW_FULLSCREEN)
-
+    
 
     # Set up pose tracker
     tracking_rtmlib = True if (tracking_mode == 'rtmlib' and tracking) else False
@@ -1205,9 +1192,9 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
     
 
     # Post-processing: Interpolate, filter, and save pose and angles
-    frame_range = [0,frame_count] if video_file == 'webcam' else frame_range
+    #frame_range = [0,frame_count] if video_file == 'webcam' else frame_range
     all_frames_time = pd.Series(np.linspace(frame_range[0]/fps, frame_range[1]/fps, frame_count), name='time')
-    
+    trc_data = None    
     if save_pose:
         logging.info('\nPost-processing pose:')
         # Select only the keypoints that are in the model from skeletons.py, invert Y axis, divide pixel values by 1000
@@ -1276,13 +1263,14 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
 
                 # Build TRC file
                 trc_data = make_trc_with_XYZ(all_frames_X_person_filt, all_frames_Y_person_filt, all_frames_Z_person, all_frames_time, str(pose_path_person))
-                logging.info(f'Pose saved to {pose_path_person.resolve()}.')
+                #logging.info(f'Pose saved to {pose_path_person.resolve()}.')
 
                 # Plotting coordinates before and after interpolation and filtering
                 if show_plots:
                     trc_data_unfiltered = pd.concat([pd.concat([all_frames_X_person.iloc[:,kpt], all_frames_Y_person.iloc[:,kpt], all_frames_Z_person.iloc[:,kpt]], axis=1) for kpt in range(len(all_frames_X_person.columns))], axis=1)
                     trc_data_unfiltered.insert(0, 't', all_frames_time)
                     pose_plots(trc_data_unfiltered, trc_data, i) # i = current person
+                #return trc_data
 
 
     # Angles post-processing
@@ -1348,3 +1336,4 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir):
                 if show_plots:
                     all_frames_angles_person.insert(0, 't', all_frames_time)
                     angle_plots(all_frames_angles_person, angle_data, i) # i = current person
+    return trc_data

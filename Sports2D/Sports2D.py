@@ -185,6 +185,69 @@ DEFAULT_CONFIG =   {'project': {'video_input': ['demo.mp4'],
                                         }
                     }
 
+DEFAULT_CONFIG2 =   {'project': {'video_input': ['test.mp4'],
+                                'time_range': [],
+                                'video_dir': '',
+                                'webcam_id': 0,
+                                'input_size': [1280, 720]
+                                },
+                    'process': {'multiperson': True,
+                                'show_realtime_results': True,
+                                'save_vid': True,
+                                'save_img': True,
+                                'save_pose': True,
+                                'save_angles': True,
+                                'result_dir': ''
+                                },
+                    'pose':     {'pose_model': 'body_with_feet',
+                                'mode': 'balanced',
+                                'det_frequency': 1,
+                                'tracking_mode': 'sports2d',
+                                'keypoint_likelihood_threshold': 0.3,
+                                'average_likelihood_threshold': 0.5,
+                                'keypoint_number_threshold': 0.3
+                                },
+                    'angles':   {'display_angle_values_on': ['body', 'list'],
+                                'fontSize': 0.3,
+                                'joint_angles': [   'Right ankle',
+                                                    'Left ankle',
+                                                    'Right knee',
+                                                    'Left knee',
+                                                    'Right hip',
+                                                    'Left hip',
+                                                    'Right shoulder',
+                                                    'Left shoulder',
+                                                    'Right elbow',
+                                                    'Left elbow'],
+                                'segment_angles': [ 'Right foot',
+                                                    'Left foot',
+                                                    'Right shank',
+                                                    'Left shank',
+                                                    'Right thigh',
+                                                    'Left thigh',
+                                                    'Pelvis',
+                                                    'Trunk',
+                                                    'Shoulders',
+                                                    'Head',
+                                                    'Right arm',
+                                                    'Left arm',
+                                                    'Right forearm',
+                                                    'Left forearm'],
+                                'flip_left_right': True
+                                },
+                    'post-processing': {'interpolate': True,
+                                        'interp_gap_smaller_than': 10,
+                                        'fill_large_gaps_with': 'last_value',
+                                        'filter': True,
+                                        'show_graphs': True,
+                                        'filter_type': 'butterworth',
+                                        'butterworth': {'order': 4, 'cut_off_frequency': 3},
+                                        'gaussian': {'sigma_kernel': 1},
+                                        'loess': {'nb_values_used': 5},
+                                        'median': {'kernel_size': 3}
+                                        }
+                    }
+
 CONFIG_HELP =   {'config': ["c", "Path to a toml configuration file"],
                 'video_input': ["i", "webcam, or video_path.mp4, or video1_path.avi video2_path.mp4 ... Beware that images won't be saved if paths contain non ASCII characters"],
                 'webcam_id': ["w", "webcam ID. 0 if not specified"],
@@ -388,6 +451,42 @@ def process(config='Config_demo.toml'):
 
     logging.shutdown()
 
+def process2(config):
+    '''
+    setup server and only do what I want
+    '''
+
+    from Sports2D.p2 import process_fun
+    
+    if type(config) == dict:
+        config_dict = config
+    else:
+        config_dict = read_config_file(config)
+    #video_dir, video_files, frame_rates, time_ranges, result_dir = base_params(config_dict)
+    # videod_dir and result_dir
+    video_dir = Path(config_dict.get('project').get('video_dir')).resolve()
+    if video_dir == '': video_dir = Path.cwd()
+    result_dir = Path(config_dict.get('process').get('result_dir')).resolve()
+    if result_dir == '': result_dir = Path.cwd()
+
+    # video_files, frame_rates, time_ranges
+    video_input = config_dict.get('project').get('video_input')
+        
+    result_dir.mkdir(parents=True, exist_ok=True)
+    #with open(result_dir / 'logs.txt', 'a+') as log_f: pass
+    logging.basicConfig(format='%(message)s', level=logging.INFO, force=True, 
+        #handlers = [logging.handlers.TimedRotatingFileHandler(result_dir / 'logs.txt', when='D', interval=7), logging.StreamHandler()]) 
+        handlers = [logging.StreamHandler()]) 
+
+    logging.info(f"stuff: vd: {video_dir} rd: {result_dir}")
+    video_file = 'test.mp4'
+    frame_rate = 30
+    time_range = None 
+    process_fun(config_dict, video_file, time_range, frame_rate, result_dir)
+
+
+    logging.shutdown()
+
 
 def main():
     '''
@@ -413,7 +512,6 @@ def main():
     - Run with a toml configuration file: 
         sports2d --config path_to_config.toml
     '''
-
     # Dynamically add arguments for each leaf key in the DEFAULT_CONFIG
     parser = argparse.ArgumentParser(description="Use sports2d to compute your athlete's pose, joint, and segment angles. See https://github.com/davidpagnon/Sports2D")
     parser.add_argument('-C', '--config', type=str, required=False, help='Path to a toml configuration file')
@@ -433,6 +531,7 @@ def main():
             parser.add_argument(*arg_str, type=list_type, nargs='*', help=CONFIG_HELP[leaf_name][1])
         else:
             parser.add_argument(*arg_str, type=type(leaf_keys[leaf_name]), help=CONFIG_HELP[leaf_name][1])
+    parser.add_argument("--serve")
     args = parser.parse_args()
 
     # If config.toml file is provided, load it, else, use default config
@@ -452,7 +551,13 @@ def main():
             set_nested_value(new_config, leaf_key, cli_value)
 
     # Run process with the new configuration dictionary
-    Sports2D.process(new_config)
+    if args.serve:
+        print(args.serve)
+        new_config = DEFAULT_CONFIG2.copy()
+        process2(new_config)
+    else:
+        print("not yet")
+        #Sports2D.process(new_config)
 
 
 if __name__ == "__main__":

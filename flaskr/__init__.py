@@ -150,8 +150,9 @@ def create_app(test_config=None):
                 print(f" TRC: {lw}")
                 #return jsonify(trc_data)
                 #return trc_data.to_json()
-                return jsonify(lw.to_csv())
+                #return jsonify(lw.to_csv())
                 #return jsonify(trc_data['t'].to_dict())
+                return lw.to_csv(lineterminator='\n')
             else:
                 return "Bad file path"
         else:

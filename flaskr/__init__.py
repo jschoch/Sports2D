@@ -7,12 +7,22 @@ from pathlib import Path
 import math
 from scipy.signal import butter, filtfilt
 import pandas as pd
+import logging
+import sys
 
 
-tracking_rtmlib = True
+logging.basicConfig(stream=sys.stderr)
+logger = logging.getLogger()
+
+
+#tracking_rtmlib = True
+tracking_rtmlib = False
 det_frequency = 1
-mode = 'balanced'
-pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
+mode = 'lightweight'
+#mode = 'performance'
+print( "LOGGING< where are yoiu?")
+pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib,logger)
+print(f" Pose Tracker\n{pose_tracker}")
 
 
 def euclidean_distance(point1, point2):

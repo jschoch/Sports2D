@@ -1,12 +1,18 @@
 import os
 
-from flask import Flask, request,jsonify
+from flask import Flask, request,jsonify,make_response
 from Sports2D.p2 import process_fun, setup_pose_tracker
 from Sports2D.Sports2D import prep_process, DEFAULT_CONFIG2
 from pathlib import Path
 import math
 from scipy.signal import butter, filtfilt
 import pandas as pd
+import socketio
+from flaskr.intern import run_inference
+
+#sio = socketio.Server(async_mode='gevent')
+#sio = socketio.Client(logger=True, engineio_logger=True)
+sio = socketio.Client(logger=True)
 
 
 tracking_rtmlib = True
@@ -102,14 +108,35 @@ def get_pt():
         print(f"found pt, not None {pose_tracker}")
     return pose_tracker
 
+def get_ocr():
+    print("looking for OCR")
+
 def create_app(test_config=None):
+    """ 
+    i guess thsi is like an init for a class...
+     
+    """
     global pose_tracker
     # create and configure the app
     app = Flask(__name__, instance_relative_config=True)
-    #app.config.from_mapping(
-        #SECRET_KEY='dev',
-        #DATABASE=os.path.join(app.instance_path, 'flaskr.sqlite'),
-    #)
+
+    @sio.event
+    def connect():
+        print('connected to server')
+
+    @sio.event
+    def do_ocr(file_path):
+        print('OCR request received for file: {0}'.format(file_path)) 
+        ocr_data = run_inference(file_path)
+        sio.emit("ocr_data",ocr_data)
+        print("sent done")
+
+    uri = "http://192.168.1.216:5004/remote"
+
+    print("trying to connect")
+    if not sio.connected:
+        sio.connect(uri)
+    
 
     if test_config is None:
         # load the instance config, if it exists, when not testing
@@ -169,8 +196,14 @@ def create_app(test_config=None):
                 return jsonify({'hip':hip_csv,'wrist': wrist_csv, 'shoulder':shoulder_csv})
                 #return lw.to_csv(lineterminator='\n')
             else:
-                return "Bad file path"
+                s = f"The file path was bad: {vidpath}"
+                response = make_response("This is an example response")
+                response.set_status(500)
+                return response
         else:
-            return "ERROR"
+            s = f"The file path was None!: {vidpath}"
+            response = make_response("This is an example response")
+            response.set_status(500)
+            return response
 
     return app

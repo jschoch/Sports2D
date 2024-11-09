@@ -476,7 +476,6 @@ def prep_process(config):
         handlers = [logging.StreamHandler()]) 
 
     logging.info(f"stuff: vd: {video_dir} rd: {result_dir}")
-    #video_file = 'test.mp4'
     #video_file = r"./test_data/swings/20241024-134406-left.mp4"
     #video_file = "C:/Users/schoch/Documents/dev/QT_UI/sim_buddy_ui/simbuddy/test_data/swings/20241024-134406-left.mp4"
     video_file = "C:/Users/schoch/Documents/dev/QT_UI/sim_buddy_ui/simbuddy/test_data/swings/test_small.mp4"

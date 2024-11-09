@@ -11,7 +11,8 @@ import pandas as pd
 
 tracking_rtmlib = True
 det_frequency = 1
-mode = 'balanced'
+#mode = 'balanced'
+mode = 'lightweight'
 pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
 
 
@@ -133,6 +134,13 @@ def create_app(test_config=None):
     config_dict,video_file, time_range, frame_rate, result_dir = prep_process(DEFAULT_CONFIG2)
     #trc_data = process_fun(config_dict, video_file, time_range, frame_rate, result_dir)
 
+    def pre_speed(lw,key):
+       lw = lw[key]
+       lw.columns = ["x","y","z"] 
+       lw = gen_speed(lw)
+       print(f"{key}: {lw.head()}")
+       return lw
+
     @app.route("/gettrc")
     def trc():
         pose_tracker = get_pt()
@@ -142,17 +150,24 @@ def create_app(test_config=None):
             if os.path.exists(vidp):
                 trc_data = process_fun(config_dict, vidp, time_range, frame_rate, result_dir,pose_tracker)
                 message = request.args.get('message')
-                lw = trc_data['LWrist']
+                #lw = trc_data['LWrist','LShoulder','LHip']
+                shoulder = pre_speed(trc_data,'LShoulder')
+                shoulder_csv = shoulder.to_csv()
+                hip = pre_speed(trc_data, 'LHip')
+                hip_csv = hip.to_csv()
+                wrist = pre_speed(trc_data, 'LWrist')
+                wrist_csv = wrist.to_csv()
+
                 #lw = lw.rename(columns = {'TRC':"Time Code","LWrist":"LWristX","LWrist":"LWristY","LWrist":"LWristZ"})
-                lw.columns = ["x", "y","z"]
-                lw = gen_speed(lw)
+                #lw.columns = ["x", "y","z"]
+                #lw = gen_speed(lw)
                 print(f" the message: {message}")
-                print(f" TRC: {lw}")
+                #print(f" TRC: {lw}")
                 #return jsonify(trc_data)
                 #return trc_data.to_json()
                 #return jsonify(lw.to_csv())
-                #return jsonify(trc_data['t'].to_dict())
-                return lw.to_csv(lineterminator='\n')
+                return jsonify({'hip':hip_csv,'wrist': wrist_csv, 'shoulder':shoulder_csv})
+                #return lw.to_csv(lineterminator='\n')
             else:
                 return "Bad file path"
         else:

@@ -8,7 +8,8 @@ import math
 from scipy.signal import butter, filtfilt
 import pandas as pd
 import socketio
-from flaskr.intern import run_inference
+from flaskr.intern import run_inference, rewrite_file_path
+import json
 
 #sio = socketio.Server(async_mode='gevent')
 #sio = socketio.Client(logger=True, engineio_logger=True)
@@ -131,7 +132,20 @@ def create_app(test_config=None):
         sio.emit("ocr_data",ocr_data)
         print("sent done")
 
-    uri = "http://192.168.1.216:5004/remote"
+    @sio.event
+    def do_vid(file_path):
+        rewritten_path = rewrite_file_path(file_path )
+        print('Video request received for file: {0}'.format(rewritten_path))
+        txt = "ERROR"
+        try:
+            txt = get_trc(rewritten_path)
+        except Exception as e:
+            print(f"Error {e}")
+
+        sio.emit('video_data', txt)
+
+    uri = "http://192.168.1.220:5004/remote"
+    #uri = "http://192.168.1.216:5004/remote"
 
     print("trying to connect")
     if not sio.connected:
@@ -172,11 +186,18 @@ def create_app(test_config=None):
     def trc():
         pose_tracker = get_pt()
         vidpath = request.args.get("path")
+        response = get_trc(vidpath)
+        return response
+        
+        
+    def get_trc(vidpath):
+        #response = make_response()
+        # TODO: fix this, it no longer works with the flask http request
         if vidpath != None:
             vidp = Path(vidpath)
             if os.path.exists(vidp):
                 trc_data = process_fun(config_dict, vidp, time_range, frame_rate, result_dir,pose_tracker)
-                message = request.args.get('message')
+                #message = request.args.get('message')
                 #lw = trc_data['LWrist','LShoulder','LHip']
                 shoulder = pre_speed(trc_data,'LShoulder')
                 shoulder_csv = shoulder.to_csv()
@@ -188,22 +209,28 @@ def create_app(test_config=None):
                 #lw = lw.rename(columns = {'TRC':"Time Code","LWrist":"LWristX","LWrist":"LWristY","LWrist":"LWristZ"})
                 #lw.columns = ["x", "y","z"]
                 #lw = gen_speed(lw)
-                print(f" the message: {message}")
+                #print(f" the message: {message}")
                 #print(f" TRC: {lw}")
                 #return jsonify(trc_data)
                 #return trc_data.to_json()
                 #return jsonify(lw.to_csv())
-                return jsonify({'hip':hip_csv,'wrist': wrist_csv, 'shoulder':shoulder_csv})
+                print("saving json")
+                #txt = jsonify({'hip':hip_csv,'wrist': wrist_csv, 'shoulder':shoulder_csv})
+                txt = json.dumps({'hip': hip_csv, 'wrist': wrist_csv, 'shoulder': shoulder_csv})
+                #response.set_data(txt)
+                #return response
+                print(f"returning txt {txt[:200]}")
+                return txt
                 #return lw.to_csv(lineterminator='\n')
             else:
                 s = f"The file path was bad: {vidpath}"
-                response = make_response("This is an example response")
-                response.set_status(500)
-                return response
+                #response.set_data("This is an example response")
+                #response.set_status(500)
+                #return response
         else:
             s = f"The file path was None!: {vidpath}"
-            response = make_response("This is an example response")
-            response.set_status(500)
-            return response
+            #response.set_data("This is an example response")
+            #response.set_status(500)
+            #return response
 
     return app

@@ -6,6 +6,7 @@ from PIL import Image
 from torchvision.transforms.functional import InterpolationMode
 from transformers import AutoModel, AutoTokenizer, AutoConfig
 import os
+import sys
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -106,18 +107,51 @@ generation_config = dict(max_new_tokens=1024, do_sample=True)
 
 
 # single-image single-round conversation (单图单轮对话)
-question2 = '<image>\ndescribe the data in the image. some values may be prefixed with "L" or "R" to denote the direction. null values are denoted with "-----".  use key value pairs and do not elaborate.'
+#question2 = '<image>\ndescribe the data in the image. some values may be prefixed with "L" or "R" to denote the direction. null values are denoted with "-----".  use key value pairs and do not elaborate.'
 
-question = '<image>\ndescribe the data in the image. some values may be prefixed with "L" or "R" to denote the direction. null values are denoted with "-----".  output the key value pairs as json.   do not elaborate.'
+#question = '<image>\ndescribe the data in the image. some values may be prefixed with "L" or "R" to denote the direction. null values are denoted with "-----".  output the key value pairs as json.   do not elaborate.'
+
+
+def rewrite_file_path(path):
+    """
+    Rewrite a Windows file path to a Unix/Linux format based on the provided mapping.
+    
+    :param windows_path: The Windows file path (e.g., "z:/Files/screenshots")
+    :param mapping: A dictionary where keys are drive letters and values are mount points (e.g., {"z": "/mnt/c/Files"})
+    :return: The rewritten Unix/Linux file path
+    """
+    # Split the path into drive letter and remaining part
+    path = path.replace("\\", "/")
+
+    if(path[0] == 'C' or path[0] == 'c'):
+        mapping = {"c": "/mnt/c/"}
+    if(path[0] == 'Z' or path[0] == 'z'):
+        mapping = {"z": "/mnt/c/Files"}
+    parts = path.split(':')
+    
+    if len(parts) == 2:
+        drive, path = parts[0], parts[1]
+        
+        if drive.lower() in mapping:
+            return f"{mapping[drive.lower()]}{path}"
+    
+    # If no match is found, return the original path
+    return path
+
 
 
 def run_inference(path):
     global model 
     # test hardcode path
-    path = '/mnt/c/Files/screenshots/t3.png'
-    pixel_values = load_image(path, max_num=12).to(torch.bfloat16).cuda()
+    #path = '/mnt/c/Files/screenshots/t3.png'
+    print(f"got path: {path}")
+    
+    rewritten_path = rewrite_file_path(path )
+    pixel_values = load_image(rewritten_path, max_num=12).to(torch.bfloat16).cuda()
     question = f"""<image>
-    describe the data in the image. some values may be prefixed with "L" or "R" 
+    The data to focus on can be found under the text "Ground Firmness:", the data 
+    is in square boxes that are red (2x3 grid), green(2x3 grid) and blue (2,3 grid).  describe the data in the image. 
+    some values may be prefixed with "L" or "R" 
     to denote the direction. null values are denoted with "-----".  output the 
     key value pairs as json.   do not elaborate."""
     print(f"run inf: question: {question}")

@@ -137,12 +137,16 @@ def create_app(test_config=None):
         print("sent done")
 
     @sio.event
-    def do_vid(file_path):
+    def do_vid(request_text):
+        request_data = json.loads(request_text)
+        file_path = request_data['file_path']
+        swingid = request_data['swingid']
         rewritten_path = rewrite_file_path(file_path )
+
         print('Video request received for file: {0}'.format(rewritten_path))
         txt = "ERROR"
         try:
-            txt = get_trc(rewritten_path)
+            txt = get_trc(rewritten_path,swingid)
         except Exception as e:
             print(f"Error {e}")
 
@@ -196,19 +200,21 @@ def create_app(test_config=None):
     def get_trc2(vidpath):
         return "ERROR, not done"
         
-    def get_trc(vidpath):
+    def get_trc(vidpath,swingid):
         #response = make_response()
         # TODO: fix this, it no longer works with the flask http request
         if vidpath != None:
             vidp = Path(vidpath)
             if os.path.exists(vidp):
                 trc_data = process_fun(config_dict, vidp, time_range, frame_rate, result_dir,pose_tracker)
+                print(f"trc data head\n{trc_data.head()}")
                 #message = request.args.get('message')
                 #lw = trc_data['LWrist','LShoulder','LHip']
-                shoulder = pre_speed(trc_data,'LShoulder')
-                shoulder_csv = shoulder.to_csv()
-                hip = pre_speed(trc_data, 'LHip')
-                hip_csv = hip.to_csv()
+
+                #shoulder = pre_speed(trc_data,'LShoulder')
+                #shoulder_csv = shoulder.to_csv()
+                #hip = pre_speed(trc_data, 'LHip')
+                #hip_csv = hip.to_csv()
                 wrist = pre_speed(trc_data, 'LWrist')
                 wrist_csv = wrist.to_csv()
 
@@ -222,7 +228,12 @@ def create_app(test_config=None):
                 #return jsonify(lw.to_csv())
                 print("saving json")
                 #txt = jsonify({'hip':hip_csv,'wrist': wrist_csv, 'shoulder':shoulder_csv})
-                txt = json.dumps({'hip': hip_csv, 'wrist': wrist_csv, 'shoulder': shoulder_csv})
+                #txt = json.dumps({'hip': hip_csv, 'wrist': wrist_csv, 'shoulder': shoulder_csv})
+                response_data = {
+                    "trc_txt": trc_data.to_csv(),
+                    "swingid":swingid
+                }
+                txt = json.dumps(response_data)
                 #response.set_data(txt)
                 #return response
                 print(f"returning txt {txt[:200]}")

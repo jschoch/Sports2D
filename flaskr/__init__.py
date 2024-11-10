@@ -126,10 +126,14 @@ def create_app(test_config=None):
         print('connected to server')
 
     @sio.event
-    def do_ocr(file_path):
-        print('OCR request received for file: {0}'.format(file_path)) 
-        ocr_data = run_inference(file_path)
-        sio.emit("ocr_data",ocr_data)
+    def do_ocr(data_txt):
+        print(f"RAW do_ocr request\n{data_txt}")
+        data = json.loads(data_txt)
+        #print('OCR request received for file: {0}'.format(data['file_path']) 
+        ocr_data_text = run_inference(data['file_path'])
+        response_data = {'ocr_data_text': ocr_data_text,'swingid': data['swingid']}
+        response_text = json.dumps(response_data)
+        sio.emit("ocr_data",response_text)
         print("sent done")
 
     @sio.event
@@ -144,8 +148,8 @@ def create_app(test_config=None):
 
         sio.emit('video_data', txt)
 
-    uri = "http://192.168.1.220:5004/remote"
-    #uri = "http://192.168.1.216:5004/remote"
+    #uri = "http://192.168.1.220:5004/remote"
+    uri = "http://192.168.1.216:5004/remote"
 
     print("trying to connect")
     if not sio.connected:
@@ -186,9 +190,11 @@ def create_app(test_config=None):
     def trc():
         pose_tracker = get_pt()
         vidpath = request.args.get("path")
-        response = get_trc(vidpath)
+        response = get_trc2(vidpath)
         return response
         
+    def get_trc2(vidpath):
+        return "ERROR, not done"
         
     def get_trc(vidpath):
         #response = make_response()

@@ -92,6 +92,8 @@ path = 'OpenGVLab/InternVL2-2B'
 model = AutoModel.from_pretrained(
     path,
     torch_dtype=torch.bfloat16,
+    #load_in_8bit=True,
+    #load_in_4bit=True,
     low_cpu_mem_usage=True,
     use_flash_attn=False,
     trust_remote_code=True).eval().cuda()
@@ -102,15 +104,8 @@ tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True, use_fast
 # set the max number of tiles in `max_num`
 #pixel_values = load_image('/home/schoch/internvl/examples/image1.jpg', max_num=12).to(torch.bfloat16).cuda()
 pixel_values = load_image('/mnt/c/Files/screenshots/t3.png', max_num=12).to(torch.bfloat16).cuda()
-generation_config = dict(max_new_tokens=1024, do_sample=True)
-
-
-
-# single-image single-round conversation (单图单轮对话)
-#question2 = '<image>\ndescribe the data in the image. some values may be prefixed with "L" or "R" to denote the direction. null values are denoted with "-----".  use key value pairs and do not elaborate.'
-
-#question = '<image>\ndescribe the data in the image. some values may be prefixed with "L" or "R" to denote the direction. null values are denoted with "-----".  output the key value pairs as json.   do not elaborate.'
-
+# gen_config=GenerationConfig(temperature=0.3))
+generation_config = dict(max_new_tokens=1024, do_sample=True,temperature=0.1)
 
 def rewrite_file_path(path):
     """
@@ -152,8 +147,30 @@ def run_inference(path):
     The data to focus on can be found under the text "Ground Firmness:", the data 
     is in square boxes that are red (2x3 grid), green(2x3 grid) and blue (2,3 grid).  describe the data in the image. 
     some values may be prefixed with "L" or "R" 
+    the data should be easily parsed into this peewee orm class 
+    'class LMData(BaseModel):
+    carry = FloatField(null=True)
+    total = FloatField(null=True)
+    roll = FloatField(null=True)
+    v_launch = FloatField(null=True)
+    height = FloatField(null=True)
+    descent = FloatField(null=True)
+    h_launch = FloatField(null=True)
+    lateral = FloatField(null=True)
+    spin = FloatField(null=True)
+    spin_axis = FloatField(null=True)
+    club_path = FloatField(null=True)'
     to denote the direction. null values are denoted with "-----".  output the 
-    key value pairs as json.   do not elaborate."""
+    key value pairs as json.   
+    just return the raw json that can be parsed correctly.
+    VERY IMPORTANT:  the json keys should match the peewee field names and the json values should be string type.
+    for example: 
+    
+    "'total':'102.2',... "
+    
+    ensure you wrap all number values as strings in quotes.  
+    ensure the json is valid and can be parsed correctly.
+    do not elaborate."""
     print(f"run inf: question: {question}")
 
     response = model.chat(tokenizer, pixel_values, question, generation_config)

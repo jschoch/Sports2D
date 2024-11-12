@@ -152,8 +152,8 @@ def create_app(test_config=None):
 
         sio.emit('video_data', txt)
 
-    #uri = "http://192.168.1.220:5004/remote"
-    uri = "http://192.168.1.216:5004/remote"
+    uri = "http://192.168.1.220:5004/remote"
+    #uri = "http://192.168.1.216:5004/remote"
 
     print("trying to connect")
     if not sio.connected:
@@ -215,8 +215,8 @@ def create_app(test_config=None):
                 #shoulder_csv = shoulder.to_csv()
                 #hip = pre_speed(trc_data, 'LHip')
                 #hip_csv = hip.to_csv()
-                wrist = pre_speed(trc_data, 'LWrist')
-                wrist_csv = wrist.to_csv()
+                #wrist = pre_speed(trc_data, 'LWrist')
+                #wrist_csv = wrist.to_csv()
 
                 #lw = lw.rename(columns = {'TRC':"Time Code","LWrist":"LWristX","LWrist":"LWristY","LWrist":"LWristZ"})
                 #lw.columns = ["x", "y","z"]

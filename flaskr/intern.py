@@ -105,7 +105,10 @@ tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True, use_fast
 #pixel_values = load_image('/home/schoch/internvl/examples/image1.jpg', max_num=12).to(torch.bfloat16).cuda()
 pixel_values = load_image('/mnt/c/Files/screenshots/t3.png', max_num=12).to(torch.bfloat16).cuda()
 # gen_config=GenerationConfig(temperature=0.3))
-generation_config = dict(max_new_tokens=1024, do_sample=True,temperature=0.1)
+generation_config = dict(
+    max_new_tokens=170,
+    do_sample=True,
+    temperature=0.1)
 
 def rewrite_file_path(path):
     """
@@ -170,6 +173,7 @@ def run_inference(path):
     
     ensure you wrap all number values as strings in quotes.  
     ensure the json is valid and can be parsed correctly.
+    critical! make sure you do not list keys more than once
     do not elaborate."""
     print(f"run inf: question: {question}")
 

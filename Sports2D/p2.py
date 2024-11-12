@@ -808,9 +808,19 @@ def make_trc_with_XYZ(X, Y, Z, time, trc_path):
     '''
 
     
-    
+    # Create a list to hold all the new DataFrames
+    new_dfs = []
+ 
     # Data
-    trc_data = pd.concat([pd.concat([X.iloc[:,kpt], Y.iloc[:,kpt], Z.iloc[:,kpt]], axis=1) for kpt in range(len(X.columns))], axis=1)
+    #trc_data = pd.concat([pd.concat([X.iloc[:,kpt], Y.iloc[:,kpt], Z.iloc[:,kpt]], axis=1) for kpt in range(len(X.columns))], axis=1)
+    # Loop through each keypoint and create the DataFrame with appropriate column names
+    for kpt in X.columns:
+        new_df = pd.concat([X[kpt], Y[kpt], Z[kpt]], axis=1)
+        new_df.columns = [f'{kpt}_{col}' for col in ['x', 'y', 'z']]
+        new_dfs.append(new_df)
+
+    # Concatenate all the DataFrames vertically
+    trc_data = pd.concat(new_dfs, axis=1)
     trc_data.insert(0, 't', time)
 
     return trc_data

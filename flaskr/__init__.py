@@ -5,11 +5,12 @@ from Sports2D.p2 import process_fun, setup_pose_tracker
 from Sports2D.Sports2D import prep_process, DEFAULT_CONFIG2
 from pathlib import Path
 import math
-from scipy.signal import butter, filtfilt
+
 import pandas as pd
 import socketio
 from flaskr.intern import run_inference, rewrite_file_path
 import json
+from flaskr.util import euclidean_distance, butter_lowpass, butter_lowpass_filter
 
 #sio = socketio.Server(async_mode='gevent')
 #sio = socketio.Client(logger=True, engineio_logger=True)
@@ -23,22 +24,7 @@ mode = 'lightweight'
 pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
 
 
-def euclidean_distance(point1, point2):
-    if point1 is None or point2 is None:
-        return None
-    return math.sqrt((point2[0] - point1[0])**2 + (point2[1] - point1[1])**2)
 
-# Function to apply Butterworth filter
-def butter_lowpass(cutoff, fs, order=10):
-    nyq = 0.5 * fs
-    normal_cutoff = cutoff / nyq
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    return b, a
-
-def butter_lowpass_filter(data, cutoff, fs, order=5, padlen=2):
-    b, a = butter_lowpass(cutoff, fs, order=order)
-    y = filtfilt(b, a, data, padlen=padlen)  # Apply filter with additional padding
-    return pd.Series(y, index=data.index)
 
 def gen_speed(data,apply_filters=True, fs=120, cutoff=12):
     calculate_constant = False
@@ -109,9 +95,6 @@ def get_pt():
         print(f"found pt, not None {pose_tracker}")
     return pose_tracker
 
-def get_ocr():
-    print("looking for OCR")
-
 def create_app(test_config=None):
     """ 
     i guess thsi is like an init for a class...
@@ -138,15 +121,19 @@ def create_app(test_config=None):
 
     @sio.event
     def do_vid(request_text):
+        """
+        handles trc video processing 
+        """
         request_data = json.loads(request_text)
         file_path = request_data['file_path']
         swingid = request_data['swingid']
+        vtype = request_data['vtype']
         rewritten_path = rewrite_file_path(file_path )
 
         print('Video request received for file: {0}'.format(rewritten_path))
         txt = "ERROR"
         try:
-            txt = get_trc(rewritten_path,swingid)
+            txt = get_trc(rewritten_path,swingid,vtype)
         except Exception as e:
             print(f"Error {e}")
 
@@ -200,7 +187,7 @@ def create_app(test_config=None):
     def get_trc2(vidpath):
         return "ERROR, not done"
         
-    def get_trc(vidpath,swingid):
+    def get_trc(vidpath,swingid,vtype):
         #response = make_response()
         # TODO: fix this, it no longer works with the flask http request
         if vidpath != None:
@@ -208,37 +195,15 @@ def create_app(test_config=None):
             if os.path.exists(vidp):
                 trc_data = process_fun(config_dict, vidp, time_range, frame_rate, result_dir,pose_tracker)
                 print(f"trc data head\n{trc_data.head()}")
-                #message = request.args.get('message')
-                #lw = trc_data['LWrist','LShoulder','LHip']
-
-                #shoulder = pre_speed(trc_data,'LShoulder')
-                #shoulder_csv = shoulder.to_csv()
-                #hip = pre_speed(trc_data, 'LHip')
-                #hip_csv = hip.to_csv()
-                #wrist = pre_speed(trc_data, 'LWrist')
-                #wrist_csv = wrist.to_csv()
-
-                #lw = lw.rename(columns = {'TRC':"Time Code","LWrist":"LWristX","LWrist":"LWristY","LWrist":"LWristZ"})
-                #lw.columns = ["x", "y","z"]
-                #lw = gen_speed(lw)
-                #print(f" the message: {message}")
-                #print(f" TRC: {lw}")
-                #return jsonify(trc_data)
-                #return trc_data.to_json()
-                #return jsonify(lw.to_csv())
                 print("saving json")
-                #txt = jsonify({'hip':hip_csv,'wrist': wrist_csv, 'shoulder':shoulder_csv})
-                #txt = json.dumps({'hip': hip_csv, 'wrist': wrist_csv, 'shoulder': shoulder_csv})
                 response_data = {
                     "trc_txt": trc_data.to_csv(),
+                    "vtype":vtype,
                     "swingid":swingid
                 }
                 txt = json.dumps(response_data)
-                #response.set_data(txt)
-                #return response
                 print(f"returning txt {txt[:200]}")
                 return txt
-                #return lw.to_csv(lineterminator='\n')
             else:
                 s = f"The file path was bad: {vidpath}"
                 #response.set_data("This is an example response")

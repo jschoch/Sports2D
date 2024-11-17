@@ -139,8 +139,8 @@ def create_app(test_config=None):
 
         sio.emit('video_data', txt)
 
-    uri = "http://192.168.1.220:5004/remote"
-    #uri = "http://192.168.1.216:5004/remote"
+    #uri = "http://192.168.1.220:5004/remote"
+    uri = "http://192.168.1.216:5004/remote"
 
     print("trying to connect")
     if not sio.connected:
@@ -194,7 +194,7 @@ def create_app(test_config=None):
             vidp = Path(vidpath)
             if os.path.exists(vidp):
                 trc_data = process_fun(config_dict, vidp, time_range, frame_rate, result_dir,pose_tracker)
-                print(f"trc data head\n{trc_data.head()}")
+                #print(f"trc data head\n{trc_data.head()}")
                 print("saving json")
                 response_data = {
                     "trc_txt": trc_data.to_csv(),

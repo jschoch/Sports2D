@@ -174,6 +174,7 @@ def run_inference(path):
     ensure you wrap all number values as strings in quotes.  
     ensure the json is valid and can be parsed correctly.
     critical! make sure you do not list keys more than once
+    Critical!  If you don't find the data return null for that key.  Do not include any other text or explanation.
     do not elaborate."""
     print(f"run inf: question: {question}")
 

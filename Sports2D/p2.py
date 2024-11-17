@@ -13,6 +13,7 @@ import cv2
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from rtmlib import PoseTracker, BodyWithFeet
+import time
 
 from Sports2D.Utilities import filter
 from Sports2D.Utilities.common import *
@@ -191,11 +192,11 @@ def setup_pose_tracker(det_frequency, mode, tracking):
         if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
             device = 'cuda'
             backend = 'onnxruntime'
-            logging.info(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
+            logging.debug(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
         #elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
             #device = 'rocm'
-            #backend = 'onnxruntime'
-            #logging.info(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
+            backend = 'onnxruntime'
+            #logging.debug(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
         else:
             raise 
     except:
@@ -210,7 +211,7 @@ def setup_pose_tracker(det_frequency, mode, tracking):
         except:
             device = 'cpu'
             backend = 'openvino'
-            logging.info(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
+            logging.debug(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
 
     # Initialize the pose tracker with Halpe26 model
     pose_tracker = PoseTracker(
@@ -1090,6 +1091,7 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     all_frames_X, all_frames_Y, all_frames_scores, all_frames_angles = [], [], [], []
     frame_processing_times = []
     frame_count = 0
+    vpStart = time.time()
     while cap.isOpened():
         if frame_count < frame_range[0]:
             cap.read()
@@ -1191,19 +1193,7 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
             frame_count += 1
 
         cap.release()
-        logging.info(f"Video processing completed.")
-        if save_vid:
-            out_vid.release()
-            if video_file == 'webcam':
-                actual_framerate = len(frame_processing_times) / sum(frame_processing_times)
-                logging.info(f"Rewriting webcam video based on the averate framerate {actual_framerate}.")
-                resample_video(vid_output_path, fps, actual_framerate)
-                fps = actual_framerate
-            logging.info(f"Processed video saved to {vid_output_path.resolve()}.")
-        if save_img:
-            logging.info(f"Processed images saved to {img_output_dir.resolve()}.")
-        if show_realtime_results:
-            cv2.destroyAllWindows()
+        logging.info(f"Video processing completed. time: {vpStart - time.time()}")
     
 
     # Post-processing: Interpolate, filter, and save pose and angles
@@ -1252,29 +1242,6 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
                     logging.info(f'No filtering.')
                     all_frames_X_person_filt = all_frames_X_person_interp
                     all_frames_Y_person_filt = all_frames_Y_person_interp
-                else:
-                    filter_type = filter_options[1]
-                    if filter_type == 'butterworth':
-                        if video_file == 'webcam':
-                            cutoff = filter_options[3]
-                            if cutoff / (fps / 2) >= 1:
-                                cutoff_old = cutoff
-                                cutoff = fps/(2+0.001)
-                                args = f'\n{cutoff_old:.1f} Hz cut-off framerate too large for a real-time framerate of {fps:.1f} Hz. Using a cut-off framerate of {cutoff:.1f} Hz instead.'
-                                filter_options[3] = cutoff
-                        else: 
-                            args = ''
-                        args = f'Butterworth filter, {filter_options[2]}th order, {filter_options[3]} Hz.'
-                        filter_options[4] = fps
-                    if filter_type == 'gaussian':
-                        args = f'Gaussian filter, Sigma kernel {filter_options[5]}.'
-                    if filter_type == 'loess':
-                        args = f'LOESS filter, window size of {filter_options[6]} frames.'
-                    if filter_type == 'median':
-                        args = f'Median filter, kernel of {filter_options[7]}.'
-                    logging.info(f'Filtering with {args}')
-                    all_frames_X_person_filt = all_frames_X_person_interp.apply(filter.filter1d, axis=0, args=filter_options)
-                    all_frames_Y_person_filt = all_frames_Y_person_interp.apply(filter.filter1d, axis=0, args=filter_options)
 
                 # Build TRC file
                 trc_data = make_trc_with_XYZ(all_frames_X_person_filt, all_frames_Y_person_filt, all_frames_Z_person, all_frames_time, str(pose_path_person))
@@ -1287,68 +1254,4 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
                     pose_plots(trc_data_unfiltered, trc_data, i) # i = current person
                 #return trc_data
 
-
-    # Angles post-processing
-    if save_angles:
-        logging.info('\nPost-processing angles:')
-        all_frames_angles = make_homogeneous(all_frames_angles)
-
-        # Process angles for each person
-        for i in range(all_frames_angles.shape[1]):
-            angles_path_person = angles_output_path.parent / (angles_output_path.stem + f'_person{i:02d}.mot')
-            all_frames_angles_person = pd.DataFrame(all_frames_angles[:,i,:], columns=angle_names)
-            
-            # Delete person if less than 4 valid frames
-            angle_nan_count = len(np.where(all_frames_angles_person.sum(axis=1)==0)[0])
-            if frame_count - angle_nan_count <= 4:
-                logging.info(f'- Person {i}: Less than 4 valid frames. Deleting person.')
-
-            else:
-                # Interpolate
-                if not interpolate:
-                    logging.info(f'- Person {i}: No interpolation.')
-                    all_frames_angles_person_interp = all_frames_angles_person
-                else:
-                    logging.info(f'- Person {i}: Interpolating missing sequences if they are smaller than {interp_gap_smaller_than} frames. Large gaps filled with {fill_large_gaps_with}.')
-                    all_frames_angles_person_interp = all_frames_angles_person.apply(interpolate_zeros_nans, axis=0, args = [interp_gap_smaller_than, 'linear'])
-                    if fill_large_gaps_with == 'last_value':
-                        all_frames_angles_person_interp = all_frames_angles_person_interp.ffill(axis=0).bfill(axis=0)
-                    elif fill_large_gaps_with == 'zeros':
-                        all_frames_angles_person_interp.replace(np.nan, 0, inplace=True)
-                
-                # Filter
-                if not filter_options[0]:
-                    logging.info(f'No filtering.')
-                    all_frames_angles_person_filt = all_frames_angles_person_interp
-                else:
-                    filter_type = filter_options[1]
-                    if filter_type == 'butterworth':
-                        if video_file == 'webcam':
-                            cutoff = filter_options[3]
-                            if cutoff / (fps / 2) >= 1:
-                                cutoff_old = cutoff
-                                cutoff = fps/(2+0.001)
-                                args = f'\n{cutoff_old:.1f} Hz cut-off framerate too large for a real-time framerate of {fps:.1f} Hz. Using a cut-off framerate of {cutoff:.1f} Hz instead.'
-                                filter_options[3] = cutoff
-                        else: 
-                            args = ''
-                        args = f'Butterworth filter, {filter_options[2]}th order, {filter_options[3]} Hz. ' + args
-                        filter_options[4] = fps
-                    if filter_type == 'gaussian':
-                        args = f'Gaussian filter, Sigma kernel {filter_options[5]}.'
-                    if filter_type == 'loess':
-                        args = f'LOESS filter, window size of {filter_options[6]} frames.'
-                    if filter_type == 'median':
-                        args = f'Median filter, kernel of {filter_options[7]}.'
-                    logging.info(f'Filtering with {args}')
-                    all_frames_angles_person_filt = all_frames_angles_person_interp.apply(filter.filter1d, axis=0, args=filter_options)
-
-                # Build mot file
-                angle_data = make_mot_with_angles(all_frames_angles_person_filt, all_frames_time, str(angles_path_person))
-                logging.info(f'Angles saved to {angles_path_person.resolve()}.')
-
-                # Plotting angles before and after interpolation and filtering
-                if show_plots:
-                    all_frames_angles_person.insert(0, 't', all_frames_time)
-                    angle_plots(all_frames_angles_person, angle_data, i) # i = current person
     return trc_data

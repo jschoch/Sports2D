@@ -195,7 +195,7 @@ def setup_pose_tracker(det_frequency, mode, tracking):
             logging.debug(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
         #elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
             #device = 'rocm'
-            backend = 'onnxruntime'
+            #backend = 'onnxruntime'
             #logging.debug(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
         else:
             raise 
@@ -1092,9 +1092,13 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     frame_processing_times = []
     frame_count = 0
     vpStart = time.time()
+
+    frames = []
     while cap.isOpened():
         if frame_count < frame_range[0]:
+            cstart = time.time()
             cap.read()
+            frame_processing_times.append(time.time() - cstart)
             frame_count += 1
             continue
 
@@ -1109,25 +1113,21 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
                     all_frames_X.append([])
                     all_frames_Y.append([])
                     all_frames_scores.append([])
-                if save_angles:
-                    all_frames_angles.append([])
                 continue
             else:
                 cv2.putText(frame, f"Press 'q' to quit", (cam_width-int(400*fontSize), cam_height-20), cv2.FONT_HERSHEY_SIMPLEX, fontSize+0.2, (255,255,255), thickness+1, cv2.LINE_AA)
                 cv2.putText(frame, f"Press 'q' to quit", (cam_width-int(400*fontSize), cam_height-20), cv2.FONT_HERSHEY_SIMPLEX, fontSize+0.2, (0,0,255), thickness, cv2.LINE_AA)
+                frames.append(frame)
+        cap.release()    
+    frameLoadTime = time.time() - vpStart
+    logging.info(f"Frame load time was {frameLoadTime}")
+    
+    for frame in frames:
             
             # Detect poses
             keypoints, scores = pose_tracker(frame)
 
-            # Track persons
-            if tracking: # multi-person
-                if tracking_rtmlib:
-                    keypoints, scores = sort_people_rtmlib(pose_tracker, keypoints, scores)
-                else:
-                    if 'prev_keypoints' not in locals(): prev_keypoints = keypoints
-                    prev_keypoints, keypoints, scores = sort_people_sports2d(prev_keypoints, keypoints, scores)
-            else: # single person
-                keypoints, scores = np.array([keypoints[0]]), np.array([scores[0]])
+            keypoints, scores = np.array([keypoints[0]]), np.array([scores[0]])
             
             
             # Process coordinates and compute angles
@@ -1157,43 +1157,16 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
                     person_X_flipped = person_X.copy()
                 valid_X_flipped.append(person_X_flipped)
                     
-                # Compute angles
-                person_angles = []
-                for ang_name in angle_names:
-                    ang = compute_angle(ang_name, person_X_flipped, person_Y, angle_dict, keypoints_ids, keypoints_names)
-                    person_angles.append(ang)
-                valid_angles.append(person_angles)
-
-            # Draw keypoints and skeleton
-            if show_realtime_results or save_vid or save_img:
-                img = frame.copy()
-                img = draw_bounding_box(img, valid_X, valid_Y, colors=colors, fontSize=fontSize, thickness=thickness)
-                img = draw_keypts(img, valid_X, valid_Y, scores, cmap_str='RdYlGn')
-                img = draw_skel(img, valid_X, valid_Y, model, colors=colors)
-                img = draw_angles(img, valid_X, valid_Y, valid_angles, valid_X_flipped, keypoints_ids, keypoints_names, angle_names, display_angle_values_on=display_angle_values_on, colors=colors, fontSize=fontSize, thickness=thickness)
-
-                if show_realtime_results:
-                    cv2.imshow(f'{video_file} Sports2D', img)
-                    if (cv2.waitKey(1) & 0xFF) == ord('q') or (cv2.waitKey(1) & 0xFF) == 27:
-                        break
-                if save_vid:
-                    out_vid.write(img)
-                if save_img:
-                    cv2.imwrite(str((img_output_dir / f'{output_dir_name}_{frame_count:06d}.png')), img)
 
             if save_pose:
                 all_frames_X.append(np.array(valid_X))
                 all_frames_Y.append(np.array(valid_Y))
                 all_frames_scores.append(np.array(valid_scores))
-            if save_angles:
-                all_frames_angles.append(np.array(valid_angles))
-            if video_file=='webcam' and save_vid:   # To adjust framerate of output video
-                elapsed_time = (datetime.now() - start_time).total_seconds()
-                frame_processing_times.append(elapsed_time)
             frame_count += 1
 
-        cap.release()
-        logging.info(f"Video processing completed. time: {vpStart - time.time()}")
+        
+    logging.info(f"Video processing completed. time: {vpStart - time.time()}")
+    logging.info(f"frame times: {frame_processing_times}")
     
 
     # Post-processing: Interpolate, filter, and save pose and angles

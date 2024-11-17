@@ -170,12 +170,14 @@ def create_app(test_config=None):
     config_dict,video_file, time_range, frame_rate, result_dir = prep_process(DEFAULT_CONFIG2)
     #trc_data = process_fun(config_dict, video_file, time_range, frame_rate, result_dir)
 
-    def pre_speed(lw,key):
-       lw = lw[key]
-       lw.columns = ["x","y","z"] 
-       lw = gen_speed(lw)
-       print(f"{key}: {lw.head()}")
-       return lw
+
+    #TODO: get rid of this and gen_speed
+    #def pre_speed(lw,key):
+       #lw = lw[key]
+       #lw.columns = ["x","y","z"] 
+       #lw = gen_speed(lw)
+       #print(f"{key}: {lw.head()}")
+       #return lw
 
     @app.route("/gettrc")
     def trc():

@@ -139,8 +139,8 @@ def create_app(test_config=None):
 
         sio.emit('video_data', txt)
 
-    #uri = "http://192.168.1.220:5004/remote"
-    uri = "http://192.168.1.216:5004/remote"
+    uri = "http://192.168.1.220:5004/remote"
+    #uri = "http://192.168.1.216:5004/remote"
 
     print("trying to connect")
     if not sio.connected:

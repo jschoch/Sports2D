@@ -76,53 +76,6 @@ __status__ = "Development"
 
 
 # FUNCTIONS
-def setup_webcam(webcam_id, save_vid, vid_output_path, input_size):
-    '''
-    Set up webcam capture with OpenCV.
-
-    INPUTS:
-    - webcam_id: int. The ID of the webcam to capture from
-    - input_size: tuple. The size of the input frame (width, height)
-
-    OUTPUTS:
-    - cap: cv2.VideoCapture. The webcam capture object
-    - out_vid: cv2.VideoWriter. The video writer object
-    - cam_width: int. The actual width of the webcam frame
-    - cam_height: int. The actual height of the webcam frame
-    - fps: int. The frame rate of the webcam
-    '''
-
-    #, cv2.CAP_DSHOW launches faster but only works for windows and esc key does not work
-    cap = cv2.VideoCapture(webcam_id) 
-    if not cap.isOpened():
-        raise ValueError(f"Error: Could not open webcam #{webcam_id}. Make sure that your webcam is available and has the right 'webcam_id' (check in your Config.toml file).")
-
-    # set width and height to closest available for the webcam
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, input_size[0])
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, input_size[1])
-    cam_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    cam_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps == 0: fps = 30
-    
-    if cam_width != input_size[0] or cam_height != input_size[1]:
-        logging.warning(f"Warning: Your webcam does not support {input_size[0]}x{input_size[1]} resolution. Resolution set to the closest supported one: {cam_width}x{cam_height}.")
-    
-    out_vid = None
-    if save_vid:
-        # fourcc MJPG produces very large files but is faster. If it is too slow, consider using it and then converting the video to h264
-        # try:
-        #     fourcc = cv2.VideoWriter_fourcc(*'avc1') # =h264. better compression and quality but may fail on some systems
-        #     out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
-        #     if not out_vid.isOpened():
-        #         raise ValueError("Failed to open video writer with 'avc1' (h264)")
-        # except Exception:
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
-            # logging.info("Failed to open video writer with 'avc1' (h264). Using 'mp4v' instead.")
-
-    return cap, out_vid, cam_width, cam_height, fps
-
 
 def setup_video(video_file_path, save_vid, vid_output_path):
     '''
@@ -155,18 +108,6 @@ def setup_video(video_file_path, save_vid, vid_output_path):
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     out_vid = None
-    if save_vid:
-        
-        if fps == 0: fps = 30
-        # try:
-        #     fourcc = cv2.VideoWriter_fourcc(*'avc1') # =h264. better compression and quality but may fail on some systems
-        #     out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
-        #     if not out_vid.isOpened():
-        #         raise ValueError("Failed to open video writer with 'avc1' (h264)")
-        # except Exception:
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
-            # logging.info("Failed to open video writer with 'avc1' (h264). Using 'mp4v' instead.")
         
     return cap, out_vid, cam_width, cam_height, fps
 
@@ -1049,9 +990,8 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     vid_output_path = output_dir / f'{output_dir_name}.mp4'
     pose_output_path = output_dir / f'{output_dir_name}_px.trc'
     angles_output_path = output_dir / f'{output_dir_name}_angles.mot'
-    output_dir.mkdir(parents=True, exist_ok=True)
-    if save_img:
-        img_output_dir.mkdir(parents=True, exist_ok=True)
+
+    #output_dir.mkdir(parents=True, exist_ok=True)
 
 
     # Retrieve keypoint names from model

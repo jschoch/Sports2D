@@ -26,7 +26,7 @@ for mode in modes:
     pose_tracker = PoseTracker(
         BodyWithFeet,
         det_frequency=det_frequency,
-        #mode=mode,  # Testing different modes
+        mode=mode,  # Testing different modes
         backend=backend,
         device=device,
         tracking=False,
@@ -45,10 +45,6 @@ for mode in modes:
 
 # visualize
 
-# if you want to use black background instead of original image,
-# img_show = np.zeros(img_show.shape, dtype=np.uint8)
-
-#img_show = np.zeros(img_show.shape, dtype=np.uint8)
 
 
 #  draw and display

@@ -11,44 +11,27 @@ device = 'rocm'  # cpu, cuda, mps
 backend = 'onnxruntime'  # opencv, onnxruntime, openvino
 img = cv2.imread('/mnt/c/Files/screenshots/test.jpg')
 
-from quark.onnx import get_library_path as vai_lib_path
-
-if 'ROCMExecutionProvider' in onnxruntime.get_available_providers():
-    device = 'rocm'
-    providers = ['ROCMExecutionProvider']
-elif 'CUDAExecutionProvider' in onnxruntime.get_available_providers():
-    device = 'CUDA'
-    providers = ['CUDAExecutionProvider']
-else:
-    device = 'CPU'
-    providers = ['CPUExecutionProvider']
-
-sess_options = onnxruntime.SessionOptions()
-sess_options.register_custom_ops_library(vai_lib_path(device))
-
-#wholebody = Wholebody(to_openpose=openpose_skeleton,
-                      #mode='balanced',  # 'performance', 'lightweight', 'balanced'. Default: 'balanced'
-                      #mode='performance',
-                      #backend=backend, device=device)
-#keypoints, scores = wholebody(img)
 
 
 #modes = ['balanced', 'performance', 'lightweight']
 modes = ['lightweight']
-det_frequency = 1  # Detection frequency
+det_frequency = 10  # Detection frequency
 
 custom = partial(
              Custom,
              to_openpose=False,
              det_class='YOLOX',
              #det='/home/schoch/.cache/rtmlib/hub/checkpoints/yolox_tiny_8xb8-300e_humanart-6f3252f9.onnx',
-             #det='testopt_det.onnx',
-             det='testopt.onnx',
+             det='testopt_det.onnx',
+             #det='testopt.onnx',
              #det_input_size=(640, 640),
              det_input_size= (416,416),
              pose_class='RTMPose',
-             pose='testopt_halpe26.onnx',
-             pose_input_size=(192, 256),
+             #pose='testopt_halpe26.onnx',
+             #pose='/home/schoch/.cache/rtmlib/hub/checkpoints/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx',
+             pose = "rtmpose-x_simcc-body7_pt-body7-halpe26_700e-384x288-7fb6e239_20230606.onnx",
+             #pose_input_size=(192, 256),
+             pose_input_size=(288,384),
              #pose_input_size=(416,416),
              backend=backend,
              device=device)
@@ -70,10 +53,11 @@ for mode in modes:
     def run_pose_tracker():
         keypoints, scores = pose_tracker(img)
 
-    print(f"Running 100 runs for mode: {mode}")
+    runs = 1000
+    print(f"Running {runs} runs for mode: {mode}")
 
-    execution_time = timeit.timeit(run_pose_tracker, number=100)  # Runs the function 100 times
-    print(f"Average execution time for '{mode}': {execution_time / 100:.6f} seconds\n")
+    execution_time = timeit.timeit(run_pose_tracker, number=runs)  # Runs the function 100 times
+    print(f"Average execution time for '{mode}': {execution_time / runs:.6f} seconds\n")
 
 # visualize
 

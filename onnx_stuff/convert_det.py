@@ -10,7 +10,7 @@ from onnxruntime.quantization.calibrate import CalibrationMethod
 import onnx
 
 
-#g_config = get_default_config("BF16")
+#g_config = get_default_config("BFP16")
 g_config = get_default_config("XINT8")
 
 #quant_config = QuantizationConfig(
@@ -25,7 +25,7 @@ quant_config = QuantizationConfig(
                                   #quant_format=VitisQuantFormat.QDQ,
                                   #activation_type=VitisQuantType.QBFloat16,
                                   #weight_type=VitisQuantType.QBFloat16,
-                                  extra_options={'BF16QDQToCast': True},
+                                  #extra_options={'BF16QDQToCast': True},
                                   execution_providers=['ROCMExecutionProvider']
                                   )
 

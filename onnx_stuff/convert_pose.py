@@ -10,8 +10,8 @@ from onnxruntime.quantization.calibrate import CalibrationMethod
 import onnx
 
 
-g_config = get_default_config("BF16")
-#g_config = get_default_config("XINT8")
+#g_config = get_default_config("BFP16")
+g_config = get_default_config("XINT8")
 
 #quant_config = QuantizationConfig(
 #    calibrate_method=quark.onnx.PowerOfTwoMethod.MinMSE,
@@ -25,7 +25,7 @@ quant_config = QuantizationConfig(
                                   #quant_format=VitisQuantFormat.QDQ,
                                   #activation_type=VitisQuantType.QBFloat16,
                                   #weight_type=VitisQuantType.QBFloat16,
-                                  extra_options={'BF16QDQToCast': True},
+                                  #extra_options={'BF16QDQToCast': True},
                                   execution_providers=['ROCMExecutionProvider']
                                   )
 
@@ -44,27 +44,24 @@ quant_config = QuantizationConfig(
 
 config = Config(global_quant_config=quant_config)
 
-config.global_quant_config.extra_options["UseRandomData"] = True
+#config.global_quant_config.extra_options["UseRandomData"] = True
 print("The configuration of the quantization is {}".format(config))
 
 
 import os
 
+print("\n\n\n  LOAD POSE MODEL \n\n\n")
 
-
-
-
-print("\n\n\n  LOAD DET MODEL \n\n\n")
-
-fname = "yolox_tiny_8xb8-300e_humanart-6f3252f9.onnx"
+fpath = "/home/schoch/.cache/rtmlib/hub/checkpoints/"
+fname = "rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx"
 pPath = os.path.join(fpath + fname)
 
 model = onnx.load(pPath)
 
-output_model_path = "testopt_det.onnx"
+output_model_path = "testopt_halpe26.onnx"
 input_model_path = pPath
 quantizer = ModelQuantizer(config)
 quant_model = quantizer.quantize_model(model_input = input_model_path,
                                        model_output = output_model_path,
-                                       calibration_data_path = None)
+                                       calibration_data_path = "calibration_images2")
 

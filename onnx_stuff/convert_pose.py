@@ -50,25 +50,8 @@ print("The configuration of the quantization is {}".format(config))
 
 import os
 
-so = ort.SessionOptions()
-so.register_custom_ops_library(vai_lib_path('cuda'))
 
 
-
-print("\n\n\n  LOAD POSE MODEL \n\n\n")
-fpath = "/home/schoch/.cache/rtmlib/hub/checkpoints/"
-#fname = "yolox_tiny_8xb8-300e_humanart-6f3252f9.onnx"
-fname = "rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx"
-pPath = os.path.join(fpath + fname)
-
-model = onnx.load(pPath)
-
-output_model_path = "testopt_halpe26.onnx"
-input_model_path = pPath
-quantizer = ModelQuantizer(config)
-quant_model = quantizer.quantize_model(model_input = input_model_path,
-                                       model_output = output_model_path,
-                                       calibration_data_path = None)
 
 
 print("\n\n\n  LOAD DET MODEL \n\n\n")

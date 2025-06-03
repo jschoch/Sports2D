@@ -130,15 +130,16 @@ def setup_pose_tracker(det_frequency, mode, tracking):
     try:
         import torch
         import onnxruntime as ort
-        if torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
-            device = 'cuda'
+        if torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
+            device = 'rocm'
             backend = 'onnxruntime'
-            logging.debug(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
-        #elif torch.cuda.is_available() == True and 'ROCMExecutionProvider' in ort.get_available_providers():
-            #device = 'rocm'
-            #backend = 'onnxruntime'
-            #logging.debug(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
+            print(f"\nValid ROCM installation found: using ONNXRuntime backend with GPU.")
+        elif torch.cuda.is_available() == True and 'CUDAExecutionProvider' in ort.get_available_providers():
+            device = 'cuda'
+            backend = 'onnxruntime' 
+            print(f"\nValid CUDA installation found: using ONNXRuntime backend with GPU.")
         else:
+            print("NO GPU DOOD!")
             raise 
     except:
         try:
@@ -152,6 +153,7 @@ def setup_pose_tracker(det_frequency, mode, tracking):
         except:
             device = 'cpu'
             backend = 'openvino'
+            print("\nno valid CUDA or GPU onnx, falling to openvino wiht CPU")
             logging.debug(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
 
     # Initialize the pose tracker with Halpe26 model
@@ -929,6 +931,7 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     '''
    
     
+    print("process_fun: configs\n")
     # Base parameters
     video_dir = Path(config_dict.get('project').get('video_dir'))
     webcam_id =  config_dict.get('project').get('webcam_id')
@@ -945,6 +948,7 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     # Pose_advanced settings
     pose_model = config_dict.get('pose').get('pose_model')
     mode = config_dict.get('pose').get('mode')
+    #mode = pose_tracker.mode
     det_frequency = config_dict.get('pose').get('det_frequency')
     tracking_mode = config_dict.get('pose').get('tracking_mode')
 
@@ -981,7 +985,7 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
 
 
     
-
+    print("process_fun: files\n")
     video_file_path = Path(video_file)
     video_file_stem = video_file_path.stem
     output_dir_name = f'{video_file_stem}_Sports2D'    
@@ -995,10 +999,13 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
 
 
     # Retrieve keypoint names from model
+    print("process_fun: eval model\n")
     model = eval(pose_model)
+    print("process_fun: ids and names\n")
     keypoints_ids = [node.id for _, _, node in RenderTree(model) if node.id!=None]
     keypoints_names = [node.name for _, _, node in RenderTree(model) if node.id!=None]
 
+    print("process_fun: indexes\n")
     Ltoe_idx = keypoints_ids[keypoints_names.index('LBigToe')]
     LHeel_idx = keypoints_ids[keypoints_names.index('LHeel')]
     Rtoe_idx = keypoints_ids[keypoints_names.index('RBigToe')]
@@ -1015,13 +1022,13 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     # Set up pose tracker
     tracking_rtmlib = True if (tracking_mode == 'rtmlib' and tracking) else False
     if (pose_tracker == None):
-        print(" setting up the pose tracker")
-        pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
+        print(" this shouldn't happen @!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        #pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
     else:
-        print(f"found pose tracker {pose_tracker}")
+        print(f"found pose tracker again {pose_tracker}")
 
     logging.info(f'Pose tracking set up for BodyWithFeet model in {mode} mode.')
-    logging.info(f'Persons are detected every {det_frequency} frames and tracked inbetween. Multi-person is {"" if tracking else "not "}selected.')
+    logging.info(f'Persons are detected every DT: {det_frequency} frames and tracked inbetween. Multi-person is {"" if tracking else "not "}selected.')
     logging.info(f"Parameters: {f'{tracking_mode=}, ' if tracking else ''}{keypoint_likelihood_threshold=}, {average_likelihood_threshold=}, {keypoint_number_threshold=}")
 
 
@@ -1065,9 +1072,20 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     for frame in frames:
             
             # Detect poses
-            keypoints, scores = pose_tracker(frame)
+            try:
+                keypoints, scores = pose_tracker(frame)
+                keypoints, scores = np.array([keypoints[0]]), np.array([scores[0]])
+            except Exception as e:
+                print("error with the bug here")
+                print(f"count: {frame_count}")
+                continue
+                #keypoints = [[]]
+                #scores = [[]]
+                keypoints =np.array([]) 
+                scores = np.array([])
+            
 
-            keypoints, scores = np.array([keypoints[0]]), np.array([scores[0]])
+            
             
             
             # Process coordinates and compute angles

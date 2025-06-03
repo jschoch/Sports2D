@@ -11,17 +11,26 @@ import socketio
 from flaskr.intern import run_inference, rewrite_file_path
 import json
 from flaskr.util import euclidean_distance, butter_lowpass, butter_lowpass_filter
+import traceback
+import time
 
 #sio = socketio.Server(async_mode='gevent')
 #sio = socketio.Client(logger=True, engineio_logger=True)
-sio = socketio.Client(logger=True)
+sio = socketio.Client(
+    reconnection=True,
+    reconnection_attempts=0,
+    reconnection_delay=1,
+    reconnection_delay_max=1,
+    logger=True)
 
 
 tracking_rtmlib = True
-det_frequency = 1
+det_frequency = 20
 #mode = 'balanced'
-mode = 'lightweight'
+#mode = 'lightweight'
+mode = 'performance'
 pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
+
 
 
 
@@ -89,7 +98,8 @@ def gen_speed(data,apply_filters=True, fs=120, cutoff=12):
 
 def get_pt():
     global pose_tracker
-    if pose_tracker == None:
+    if pose_tracker is None:
+        pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
         print( "shit")
     else:
         print(f"found pt, not None {pose_tracker}")
@@ -135,7 +145,8 @@ def create_app(test_config=None):
         try:
             txt = get_trc(rewritten_path,swingid,vtype)
         except Exception as e:
-            print(f"Error {e}")
+            print(f"\n\n\nError {e}")
+            traceback.print_exc() # Prints the full traceback
 
         sio.emit('video_data', txt)
 
@@ -143,8 +154,16 @@ def create_app(test_config=None):
     #uri = "http://192.168.1.216:5004/remote"
 
     print("trying to connect")
-    if not sio.connected:
-        sio.connect(uri)
+    #  for debugging
+    start_websocket = True
+    if not sio.connected and start_websocket:
+        print("Creating initial connection")
+        while(not sio.connected):
+            try:
+                sio.connect(uri)
+            except Exception as e:
+                print("can't connect,sleeping")
+                time.sleep(1)
     
 
     if test_config is None:
@@ -164,10 +183,49 @@ def create_app(test_config=None):
     @app.route('/hello')
     def hello():
         return 'Hello, World!'
+
+    @app.route('/tst')
+    def tst():
+
+        swingid = 1
+        vidp = Path("/mnt/c/Files/new_swings/20250602-144555-right.mp4")
+        vtype = "r"
+        pose_tracker = get_pt()
+        pose_tracker.reset()
+        trc_data = process_fun(config_dict, vidp, time_range, frame_rate, result_dir,pose_tracker)
+        response_data = {
+                    "trc_txt": trc_data.to_csv(),
+                    "vtype":vtype,
+                    "swingid":swingid
+                }
+        txt = json.dumps(response_data)
+        print(f"returning txt {txt[:200]}")
+        return txt
+
+    @app.route('/tst2')
+    def tst2():
+
+        swingid = 1
+        vidp = Path("/mnt/c/Files/new_swings/20250602-144555-left.mp4")
+        vtype = "r"
+        #pose_tracker = get_pt()
+        #pose_tracker.reset()
+        pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
+        trc_data = process_fun(config_dict, vidp, time_range, frame_rate, result_dir,pose_tracker)
+        response_data = {
+                    "trc_txt": trc_data.to_csv(),
+                    "vtype":vtype,
+                    "swingid":swingid
+                }
+        txt = json.dumps(response_data)
+        print(f"returning txt {txt[:200]}")
+        return txt
     
     print("this is init i guess")
     
     config_dict,video_file, time_range, frame_rate, result_dir = prep_process(DEFAULT_CONFIG2)
+    config_dict["mode"] = mode
+    config_dict["det_frequency"] = det_frequency
     #trc_data = process_fun(config_dict, video_file, time_range, frame_rate, result_dir)
 
 
@@ -194,7 +252,10 @@ def create_app(test_config=None):
         # TODO: fix this, it no longer works with the flask http request
         if vidpath != None:
             vidp = Path(vidpath)
+            print(f"the path was: {vidp}")
             if os.path.exists(vidp):
+                print(f"calling process_fun")
+                pose_tracker.reset()
                 trc_data = process_fun(config_dict, vidp, time_range, frame_rate, result_dir,pose_tracker)
                 #print(f"trc data head\n{trc_data.head()}")
                 print("saving json")

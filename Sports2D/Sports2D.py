@@ -236,7 +236,7 @@ DEFAULT_CONFIG2 =   {'project': {'video_input': ['test.mp4'],
                                 'flip_left_right': True
                                 },
                     'post-processing': {'interpolate': True,
-                                        'interp_gap_smaller_than': 10,
+                                        'interp_gap_smaller_than': 2,
                                         'fill_large_gaps_with': 'last_value',
                                         'filter': False,
                                         'show_graphs': False,

@@ -12,12 +12,13 @@ import pandas as pd
 import cv2
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from rtmlib import PoseTracker, BodyWithFeet
+from rtmlib import PoseTracker, BodyWithFeet, Custom
 import time
 
 from Sports2D.Utilities import filter
 from Sports2D.Utilities.common import *
 from Sports2D.Utilities.skeletons import *
+from functools import partial
 
 
 ## CONSTANTS
@@ -108,6 +109,17 @@ def setup_video(video_file_path, save_vid, vid_output_path):
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     out_vid = None
+    if save_vid:
+        # fourcc MJPG produces very large files but is faster. If it is too slow, consider using it and then converting the video to h264
+        # try:
+        #     fourcc = cv2.VideoWriter_fourcc(*'avc1') # =h264. better compression and quality but may fail on some systems
+        #     out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
+        #     if not out_vid.isOpened():
+        #         raise ValueError("Failed to open video writer with 'avc1' (h264)")
+        # except Exception:
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out_vid = cv2.VideoWriter(vid_output_path, fourcc, fps, (cam_width, cam_height))
+            # logging.info("Failed to open video writer with 'avc1' (h264). Using 'mp4v' instead.")
         
     return cap, out_vid, cam_width, cam_height, fps
 
@@ -156,17 +168,52 @@ def setup_pose_tracker(det_frequency, mode, tracking):
             print("\nno valid CUDA or GPU onnx, falling to openvino wiht CPU")
             logging.debug(f"\nNo valid CUDA installation found: using OpenVINO backend with CPU.")
 
+
+    # using custom so we can more easily use different models
+
+    #TODO: consider an arg to process at a higher quality
+
     # Initialize the pose tracker with Halpe26 model
-    pose_tracker = PoseTracker(
-        BodyWithFeet,
+    #pose_tracker = PoseTracker(
+    #    BodyWithFeet,
+    #    det_frequency=det_frequency,
+    #    mode=mode,
+    #    backend=backend,
+    #    device=device,
+    #    tracking=tracking,
+    #    to_openpose=False)
+
+    custom = partial(
+             Custom,
+             to_openpose=False,
+             det_class='YOLOX',
+             #det='/home/schoch/.cache/rtmlib/hub/checkpoints/yolox_tiny_8xb8-300e_humanart-6f3252f9.onnx',
+             det='./onnx_stuff/testopt_det.onnx',
+             #det='testopt.onnx',
+             #det_input_size=(640, 640),
+             det_input_size= (416,416),
+             pose_class='RTMPose',
+             #pose='testopt_halpe26.onnx',
+             pose='/home/schoch/.cache/rtmlib/hub/checkpoints/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx',
+             #pose = "rtmpose-x_simcc-body7_pt-body7-halpe26_700e-384x288-7fb6e239_20230606.onnx",
+             pose_input_size=(192, 256),
+             #pose_input_size=(288,384),
+             #pose_input_size=(416,416),
+             backend=backend,
+             device=device)
+    pose_tracker2 = PoseTracker(
+        custom,
         det_frequency=det_frequency,
-        mode=mode,
+        mode=mode,  # Testing different modes
         backend=backend,
         device=device,
-        tracking=tracking,
-        to_openpose=False)
+        tracking=True,
+        to_openpose=False
+    )
         
-    return pose_tracker
+    return pose_tracker2
+
+#def getOldPT():
 
 
 def flip_left_right_direction(person_X, L_R_direction_idx, keypoints_names, keypoints_ids):
@@ -506,216 +553,25 @@ def draw_keypts(img, X, Y, scores, cmap_str='RdYlGn'):
 
 
 def draw_angles(img, valid_X, valid_Y, valid_angles, valid_X_flipped, keypoints_ids, keypoints_names, angle_names, display_angle_values_on= ['body', 'list'], colors=[(255, 0, 0), (0, 255, 0), (0, 0, 255)], fontSize=0.3, thickness=1):
-    '''
-    Draw angles on the image.
-    Angles are displayed as a list on the image and/or on the body.
-
-    INPUTS:
-    - img: opencv image
-    - valid_X: list of list of x coordinates
-    - valid_Y: list of list of y coordinates
-    - valid_angles: list of list of angles
-    - valid_X_flipped: list of list of x coordinates after flipping if needed
-    - keypoints_ids: list of keypoint ids (see skeletons.py)
-    - keypoints_names: list of keypoint names (see skeletons.py)
-    - angle_names: list of angle names
-    - display_angle_values_on: list of str. 'body' and/or 'list'
-    - colors: list of colors to cycle through
-
-    OUTPUT:
-    - img: image with angles
-    '''
-
-    color_cycle = it.cycle(colors)
-    for person_id, (X,Y,angles, X_flipped) in enumerate(zip(valid_X, valid_Y, valid_angles, valid_X_flipped)):
-        c = next(color_cycle)
-        if not np.isnan(X).all():
-            # person label
-            if 'list' in display_angle_values_on:
-                person_label_position = (int(10 + fontSize*150/0.3*person_id), int(fontSize*50))
-                cv2.putText(img, f'person {person_id}', person_label_position, cv2.FONT_HERSHEY_SIMPLEX, fontSize+0.2, (255,255,255), thickness+1, cv2.LINE_AA)
-                cv2.putText(img, f'person {person_id}', person_label_position, cv2.FONT_HERSHEY_SIMPLEX, fontSize+0.2, c, thickness, cv2.LINE_AA)
-            
-            # angle lines, names and values
-            ang_label_line = 1
-            for k, ang in enumerate(angles):
-                if not np.isnan(ang):
-                    ang_name = angle_names[k]
-                    ang_params = angle_dict.get(ang_name)
-                    if ang_params is not None:
-                        ang_coords = np.array([[X[keypoints_ids[keypoints_names.index(kpt)]], Y[keypoints_ids[keypoints_names.index(kpt)]]] for kpt in ang_params[0] if kpt in keypoints_names])
-                        X_flipped_coords = [X_flipped[keypoints_ids[keypoints_names.index(kpt)]] for kpt in ang_params[0] if kpt in keypoints_names]
-                        flip = -1 if any(x_flipped < 0 for x_flipped in X_flipped_coords) else 1
-                        flip = 1 if ang_name in ['pelvis', 'trunk', 'shoulders'] else flip
-                        right_angle = True if ang_params[2]==90 else False
-                        
-                        # Draw angle
-                        if len(ang_coords) == 2: # segment angle
-                            app_point, vec = draw_segment_angle(img, ang_coords, flip)
-                        else: # joint angle
-                            app_point, vec1, vec2 = draw_joint_angle(img, ang_coords, flip, right_angle)
-    
-                        # Write angle on body
-                        if 'body' in display_angle_values_on:
-                            if len(ang_coords) == 2: # segment angle
-                                write_angle_on_body(img, ang, app_point, vec, np.array([1,0]), dist=20, color=(255,255,255), fontSize=fontSize, thickness=thickness)
-                            else: # joint angle
-                                write_angle_on_body(img, ang, app_point, vec1, vec2, dist=40, color=(0,255,0), fontSize=fontSize, thickness=thickness)
-
-                        # Write angle as a list on image with progress bar
-                        if 'list' in display_angle_values_on:
-                            if len(ang_coords) == 2: # segment angle
-                                ang_label_line = write_angle_as_list(img, ang, ang_name, person_label_position, ang_label_line, color = (255,255,255), fontSize=fontSize, thickness=thickness)
-                            else:
-                                ang_label_line = write_angle_as_list(img, ang, ang_name, person_label_position, ang_label_line, color = (0,255,0), fontSize=fontSize, thickness=thickness)
-
+    print("not doing this")
     return img
 
 
 def draw_segment_angle(img, ang_coords, flip):
-    '''
-    Draw a segment angle on the image.
-
-    INPUTS:
-    - img: opencv image
-    - ang_coords: np.array. The 2D coordinates of the keypoints
-    - flip: int. Whether the angle should be flipped
-
-    OUTPUT:
-    - app_point: np.array. The point where the angle is displayed
-    - unit_segment_direction: np.array. The unit vector of the segment direction
-    - img: image with the angle
-    '''
-    
-    if not np.any(np.isnan(ang_coords)):
-        app_point = np.int32(np.mean(ang_coords, axis=0))
-
-        # segment line
-        segment_direction = np.int32(ang_coords[0]) - np.int32(ang_coords[1])
-        if (segment_direction==0).all():
-            return app_point, np.array([0,0])
-        unit_segment_direction = segment_direction/np.linalg.norm(segment_direction)
-        cv2.line(img, app_point, np.int32(app_point+unit_segment_direction*20), (255,255,255), thickness)
-
-        # horizontal line
-        cv2.line(img, app_point, (np.int32(app_point[0])+flip*20, np.int32(app_point[1])), (255,255,255), thickness)
-
-        return app_point, unit_segment_direction
+    print("not drwaing segment angles")
+    return None, None
+    return app_point, unit_segment_direction
 
 
 def draw_joint_angle(img, ang_coords, flip, right_angle):
-    '''
-    Draw a joint angle on the image.
-
-    INPUTS:
-    - img: opencv image
-    - ang_coords: np.array. The 2D coordinates of the keypoints
-    - flip: int. Whether the angle should be flipped
-    - right_angle: bool. Whether the angle should be offset by 90 degrees
-
-    OUTPUT:
-    - app_point: np.array. The point where the angle is displayed
-    - unit_segment_direction: np.array. The unit vector of the segment direction
-    - unit_parentsegment_direction: np.array. The unit vector of the parent segment direction
-    - img: image with the angle
-    '''
-    
-    if not np.any(np.isnan(ang_coords)):
-        app_point = np.int32(ang_coords[1])
-        
-        segment_direction = np.int32(ang_coords[0] - ang_coords[1])
-        parentsegment_direction = np.int32(ang_coords[-2] - ang_coords[-1])
-        if (segment_direction==0).all() or (parentsegment_direction==0).all():
-            return app_point, np.array([0,0]), np.array([0,0])
-        
-        if right_angle:
-            segment_direction = np.array([-flip*segment_direction[1], flip*segment_direction[0]])
-            segment_direction, parentsegment_direction = parentsegment_direction, segment_direction
-
-        # segment line
-        unit_segment_direction = segment_direction/np.linalg.norm(segment_direction)
-        cv2.line(img, app_point, np.int32(app_point+unit_segment_direction*40), (0,255,0), thickness)
-        
-        # parent segment dotted line
-        unit_parentsegment_direction = parentsegment_direction/np.linalg.norm(parentsegment_direction)
-        draw_dotted_line(img, app_point, unit_parentsegment_direction, 40, color=(0, 255, 0), gap=7, dot_length=3, thickness=thickness)
-
-        # arc
-        start_angle = np.degrees(np.arctan2(unit_segment_direction[1], unit_segment_direction[0]))
-        end_angle = np.degrees(np.arctan2(unit_parentsegment_direction[1], unit_parentsegment_direction[0]))
-        if abs(end_angle - start_angle) > 180:
-            if end_angle > start_angle: start_angle += 360
-            else: end_angle += 360
-        cv2.ellipse(img, app_point, (20, 20), 0, start_angle, end_angle, (0, 255, 0), thickness)
-
-        return app_point, unit_segment_direction, unit_parentsegment_direction
+    print("not doing draw joint angles")
+    return None,None,None
 
 
 def write_angle_on_body(img, ang, app_point, vec1, vec2, dist=40, color=(255,255,255), fontSize=0.3, thickness=1):
-    '''
-    Write the angle on the body.
-
-    INPUTS:
-    - img: opencv image
-    - ang: float. The angle value to display
-    - app_point: np.array. The point where the angle is displayed
-    - vec1: np.array. The unit vector of the first segment
-    - vec2: np.array. The unit vector of the second segment
-    - dist: int. The distance from the origin where to write the angle
-    - color: tuple. The color of the angle
-
-    OUTPUT:
-    - img: image with the angle
-    '''
-
-    vec_sum = vec1 + vec2
-    if (vec_sum == 0.).all():
-        return
-    unit_vec_sum = vec_sum/np.linalg.norm(vec_sum)
-    text_position = np.int32(app_point + unit_vec_sum*dist)
-    cv2.putText(img, f'{ang:.1f}', text_position, cv2.FONT_HERSHEY_SIMPLEX, fontSize, (0,0,0), thickness+1, cv2.LINE_AA)
-    cv2.putText(img, f'{ang:.1f}', text_position, cv2.FONT_HERSHEY_SIMPLEX, fontSize, color, thickness, cv2.LINE_AA)
-
+    return
 
 def write_angle_as_list(img, ang, ang_name, person_label_position, ang_label_line, color=(255,255,255), fontSize=0.3, thickness=1):
-    '''
-    Write the angle as a list on the image with a progress bar.
-
-    INPUTS:
-    - img: opencv image
-    - ang: float. The value of the angle to display
-    - ang_name: str. The name of the angle
-    - person_label_position: tuple. The position of the person label
-    - ang_label_line: int. The line where to write the angle
-    - color: tuple. The color of the angle
-
-    OUTPUT:
-    - ang_label_line: int. The updated line where to write the next angle
-    - img: image with the angle
-    '''
-    
-    if not np.any(np.isnan(ang)):
-        # angle names and values
-        ang_label_position = (person_label_position[0], person_label_position[1]+int((ang_label_line)*40*fontSize))
-        ang_value_position = (ang_label_position[0]+int(250*fontSize), ang_label_position[1])
-        cv2.putText(img, f'{ang_name}:', ang_label_position, cv2.FONT_HERSHEY_SIMPLEX, fontSize, (0, 0, 0), thickness+1, cv2.LINE_AA)
-        cv2.putText(img, f'{ang_name}:', ang_label_position, cv2.FONT_HERSHEY_SIMPLEX, fontSize, color, thickness, cv2.LINE_AA)
-        cv2.putText(img, f'{ang:.1f}', ang_value_position, cv2.FONT_HERSHEY_SIMPLEX, fontSize, (0, 0, 0), thickness+1, cv2.LINE_AA)
-        cv2.putText(img, f'{ang:.1f}', ang_value_position, cv2.FONT_HERSHEY_SIMPLEX, fontSize, color, thickness, cv2.LINE_AA)
-        
-        # progress bar
-        ang_percent = int(ang*50/180)
-        y_crop, y_crop_end = ang_value_position[1] - int(35*fontSize), ang_value_position[1]
-        x_crop, x_crop_end = ang_label_position[0]+int(300*fontSize), ang_label_position[0]+int(300*fontSize)+int(ang_percent*fontSize/0.3)
-        if ang_percent < 0:
-            x_crop, x_crop_end = x_crop_end, x_crop
-        img_crop = img[y_crop:y_crop_end, x_crop:x_crop_end]
-        if img_crop.size>0:
-            white_rect = np.ones(img_crop.shape, dtype=np.uint8)*255
-            alpha_rect = cv2.addWeighted(img_crop, 0.6, white_rect, 0.4, 1.0)
-            img[y_crop:y_crop_end, x_crop:x_crop_end] = alpha_rect
-
-        ang_label_line += 1
     
     return ang_label_line
 
@@ -771,38 +627,6 @@ def make_trc_with_XYZ(X, Y, Z, time, trc_path):
 
 
 def make_mot_with_angles(angles, time, mot_path):
-    '''
-    Write a mot file from angles and time, compatible with OpenSim.
-
-    INPUTS:
-    - angles: pd.DataFrame. The angles to write
-    - time: pd.Series. The time series for the angles
-    - mot_path: str. The path where to save the mot file
-
-    OUTPUT:
-    - angles: pd.DataFrame. The data that has been written to the MOT file
-    '''
-
-    # Header
-    nRows, nColumns = angles.shape
-    angle_names = angles.columns
-    header_mot = ['Coordinates', 
-                  'version=1', 
-                  f'{nRows=}',
-                  f'{nColumns=}',
-                  'inDegrees=yes',
-                  '',
-                  'Units are S.I. units (second, meters, Newtons, ...)',
-                  "If the header above contains a line with 'inDegrees', this indicates whether rotational values are in degrees (yes) or radians (no).",
-                  '',
-                  'endheader',
-                  'time\t' + '\t'.join(angle_names)]
-                  
-    # Write file
-    angles.insert(0,'time',time)
-    with open(mot_path, 'w') as mot_o:
-        [mot_o.write(line+'\n') for line in header_mot]
-        angles.to_csv(mot_o, sep='\t', index=False, header=None, lineterminator='\n')
 
     return angles
 
@@ -810,7 +634,7 @@ def make_mot_with_angles(angles, time, mot_path):
 def pose_plots(trc_data_unfiltered, trc_data, person_id):
     '''
     Displays trc filtered and unfiltered data for comparison
-    /!\ Often crashes on the third window...
+     Often crashes on the third window...
 
     INPUTS:
     - trc_data_unfiltered: pd.DataFrame. The unfiltered trc data
@@ -853,7 +677,7 @@ def pose_plots(trc_data_unfiltered, trc_data, person_id):
 def angle_plots(angle_data_unfiltered, angle_data, person_id):
     '''
     Displays angle filtered and unfiltered data for comparison
-    /!\ Often crashes on the third window...
+     Often crashes on the third window...
 
     INPUTS:
     - angle_data_unfiltered: pd.DataFrame. The unfiltered angle data
@@ -910,7 +734,7 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     - optionally plots pose and angle data before and after processing for comparison
     - optionally saves poses for each person as a trc file, and angles as a mot file
         
-    /!\ Warning /!\d
+     Warning d
     - The pose detection is only as good as the pose estimation algorithm, i.e., it is not perfect.
     - It will lead to reliable results only if the persons move in the 2D plane (sagittal or frontal plane).
     - The persons need to be filmed as perpendicularly as possible from their side.
@@ -933,17 +757,12 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     
     print("process_fun: configs\n")
     # Base parameters
-    video_dir = Path(config_dict.get('project').get('video_dir'))
-    webcam_id =  config_dict.get('project').get('webcam_id')
-    input_size = config_dict.get('project').get('input_size')
 
     # Process settings
     tracking = config_dict.get('process').get('multiperson')
-    show_realtime_results = config_dict.get('process').get('show_realtime_results')
-    save_vid = config_dict.get('process').get('save_vid')
-    save_img = config_dict.get('process').get('save_img')
+    #save_vid = config_dict.get('process').get('save_vid')
+    save_vid = False
     save_pose = config_dict.get('process').get('save_pose')
-    save_angles = config_dict.get('process').get('save_angles')
 
     # Pose_advanced settings
     pose_model = config_dict.get('pose').get('pose_model')
@@ -961,7 +780,6 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     segment_angle_names = config_dict.get('angles').get('segment_angles')
     angle_names = joint_angle_names + segment_angle_names
     angle_names = [angle_name.lower() for angle_name in angle_names]
-    display_angle_values_on = config_dict.get('angles').get('display_angle_values_on')
     fontSize = config_dict.get('angles').get('fontSize')
     thickness = 1 if fontSize < 0.8 else 2
     flip_left_right = config_dict.get('angles').get('flip_left_right')
@@ -990,10 +808,8 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
     video_file_stem = video_file_path.stem
     output_dir_name = f'{video_file_stem}_Sports2D'    
     output_dir = result_dir / output_dir_name
-    img_output_dir = output_dir / f'{output_dir_name}_img'
-    vid_output_path = output_dir / f'{output_dir_name}.mp4'
+    vid_output_path = f'out-{video_file_stem}.mp4'
     pose_output_path = output_dir / f'{output_dir_name}_px.trc'
-    angles_output_path = output_dir / f'{output_dir_name}_angles.mot'
 
     #output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1021,6 +837,7 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
 
     # Set up pose tracker
     tracking_rtmlib = True if (tracking_mode == 'rtmlib' and tracking) else False
+
     if (pose_tracker == None):
         print(" this shouldn't happen @!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         #pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
@@ -1062,8 +879,9 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
                     all_frames_scores.append([])
                 continue
             else:
-                cv2.putText(frame, f"Press 'q' to quit", (cam_width-int(400*fontSize), cam_height-20), cv2.FONT_HERSHEY_SIMPLEX, fontSize+0.2, (255,255,255), thickness+1, cv2.LINE_AA)
-                cv2.putText(frame, f"Press 'q' to quit", (cam_width-int(400*fontSize), cam_height-20), cv2.FONT_HERSHEY_SIMPLEX, fontSize+0.2, (0,0,255), thickness, cv2.LINE_AA)
+                #cv2.putText(frame, f"Press 'q' to quit", (cam_width-int(400*fontSize), cam_height-20), cv2.FONT_HERSHEY_SIMPLEX, fontSize+0.2, (255,255,255), thickness+1, cv2.LINE_AA)
+                #cv2.putText(frame, f"Press 'q' to quit", (cam_width-int(400*fontSize), cam_height-20), cv2.FONT_HERSHEY_SIMPLEX, fontSize+0.2, (0,0,255), thickness, cv2.LINE_AA)
+                frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
                 frames.append(frame)
         cap.release()    
     frameLoadTime = time.time() - vpStart
@@ -1078,15 +896,14 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
             except Exception as e:
                 print("error with the bug here")
                 print(f"count: {frame_count}")
-                continue
+                #continue
                 #keypoints = [[]]
                 #scores = [[]]
-                keypoints =np.array([]) 
-                scores = np.array([])
-            
-
-            
-            
+                #keypoints =np.array([]) 
+                #scores = np.array([])
+                keypoint_nb = 26
+                keypoints = np.full((1, keypoint_nb, 2), np.nan)
+                scores = np.full((1, keypoint_nb), np.nan)
             
             # Process coordinates and compute angles
             valid_X, valid_Y, valid_scores = [], [], []
@@ -1115,13 +932,19 @@ def process_fun(config_dict, video_file, time_range, frame_rate, result_dir, pos
                     person_X_flipped = person_X.copy()
                 valid_X_flipped.append(person_X_flipped)
                     
-
+            if save_vid:
+                print('saving vid')
+                img = frame.copy()
+                img = draw_skel(img, valid_X, valid_Y, model, colors=colors)
+                out_vid.write(img)
             if save_pose:
                 all_frames_X.append(np.array(valid_X))
                 all_frames_Y.append(np.array(valid_Y))
                 all_frames_scores.append(np.array(valid_scores))
             frame_count += 1
 
+    if save_vid:
+        out_vid.release()
         
     logging.info(f"Video processing completed. time: {vpStart - time.time()}")
     logging.info(f"frame times: {frame_processing_times}")

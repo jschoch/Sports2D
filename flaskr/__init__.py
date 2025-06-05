@@ -26,9 +26,9 @@ sio = socketio.Client(
 
 tracking_rtmlib = True
 det_frequency = 20
-#mode = 'balanced'
+mode = 'balanced'
 #mode = 'lightweight'
-mode = 'performance'
+#mode = 'performance'
 pose_tracker = setup_pose_tracker(det_frequency, mode, tracking_rtmlib)
 
 
@@ -150,8 +150,8 @@ def create_app(test_config=None):
 
         sio.emit('video_data', txt)
 
-    uri = "http://192.168.1.220:5004/remote"
-    #uri = "http://192.168.1.216:5004/remote"
+    #uri = "http://192.168.1.220:5004/remote"
+    uri = "http://192.168.1.216:5004/remote"
 
     print("trying to connect")
     #  for debugging
@@ -226,16 +226,8 @@ def create_app(test_config=None):
     config_dict,video_file, time_range, frame_rate, result_dir = prep_process(DEFAULT_CONFIG2)
     config_dict["mode"] = mode
     config_dict["det_frequency"] = det_frequency
-    #trc_data = process_fun(config_dict, video_file, time_range, frame_rate, result_dir)
 
 
-    #TODO: get rid of this and gen_speed
-    #def pre_speed(lw,key):
-       #lw = lw[key]
-       #lw.columns = ["x","y","z"] 
-       #lw = gen_speed(lw)
-       #print(f"{key}: {lw.head()}")
-       #return lw
 
     @app.route("/gettrc")
     def trc():
@@ -248,7 +240,6 @@ def create_app(test_config=None):
         return "ERROR, not done"
         
     def get_trc(vidpath,swingid,vtype):
-        #response = make_response()
         # TODO: fix this, it no longer works with the flask http request
         if vidpath != None:
             vidp = Path(vidpath)
@@ -269,13 +260,7 @@ def create_app(test_config=None):
                 return txt
             else:
                 s = f"The file path was bad: {vidpath}"
-                #response.set_data("This is an example response")
-                #response.set_status(500)
-                #return response
         else:
             s = f"The file path was None!: {vidpath}"
-            #response.set_data("This is an example response")
-            #response.set_status(500)
-            #return response
 
     return app

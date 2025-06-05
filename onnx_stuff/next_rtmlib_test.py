@@ -45,7 +45,6 @@ for mode in modes:
         backend=backend,
         device=device,
         tracking=False,
-        #det="testopt.onnx",
         to_openpose=False
     )
 

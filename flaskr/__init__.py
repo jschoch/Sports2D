@@ -161,6 +161,7 @@ def create_app(test_config=None):
         while(not sio.connected):
             try:
                 sio.connect(uri)
+                #sio.connect(uri2)
             except Exception as e:
                 print("can't connect,sleeping")
                 time.sleep(1)

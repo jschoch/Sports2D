@@ -29,25 +29,26 @@ custom = partial(
              pose_class='RTMPose',
              #pose='testopt_halpe26.onnx',
              #pose='/home/schoch/.cache/rtmlib/hub/checkpoints/rtmpose-m_simcc-body7_pt-body7-halpe26_700e-256x192-4d3e73dd_20230605.onnx',
-             pose = "rtmpose-x_simcc-body7_pt-body7-halpe26_700e-384x288-7fb6e239_20230606.onnx",
+             #pose = "rtmpose-x_simcc-body7_pt-body7-halpe26_700e-384x288-7fb6e239_20230606.onnx",
+             pose = "RTMW_x.onnx",
              #pose_input_size=(192, 256),
              pose_input_size=(288,384),
              #pose_input_size=(416,416),
              backend=backend,
              device=device)
 
+
 # Run tests for each mode
-for mode in modes:
-    pose_tracker = PoseTracker(
+pose_tracker = PoseTracker(
         custom,
         det_frequency=det_frequency,
-        mode=mode,  # Testing different modes
+        mode='lightweight',  # Testing different modes
         backend=backend,
         device=device,
         tracking=False,
         to_openpose=False
     )
-
+for mode in modes:
     # Define function for time measurement
     def run_pose_tracker():
         keypoints, scores = pose_tracker(img)
